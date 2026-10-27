@@ -61,7 +61,7 @@ uv run job-pipeline daily     # scrape → pre-filter → deep-fit → digest �
 | Mode | How | Best for |
 |---|---|---|
 | **API key** (default) | Create a key at [console.anthropic.com](https://console.anthropic.com/settings/keys) and paste it on the Setup page. It's saved to `.env`, which is gitignored. | Everyone. Pay-as-you-go. |
-| **Claude Code login** | Click **Install** on step 1 (or install [Claude Code](https://claude.com/claude-code) yourself), then **Get a login token**: it opens a terminal running `claude setup-token`, and you paste the token it prints. The app drives that CLI through the [Claude Agent SDK](https://docs.claude.com/en/docs/agent-sdk/overview), so you don't paste a key. | Running the tool for yourself, on your own machine. |
+| **Claude Code login** | Click **Install** on step 1 (or install [Claude Code](https://claude.com/claude-code) yourself), then **Log in with Claude**: your browser opens for the Claude login, and when it says "You're all set" the page picks up the token by itself (it runs `claude setup-token` for you and saves the token to `.env`). The app drives that CLI through the [Claude Agent SDK](https://docs.claude.com/en/docs/agent-sdk/overview), so you don't paste a key. | Running the tool for yourself, on your own machine. |
 
 > **About Claude Code login mode:** Anthropic's terms ask third-party tools to use
 > API keys rather than claude.ai logins. This mode exists so you can run this

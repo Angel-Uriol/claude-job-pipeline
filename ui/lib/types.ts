@@ -372,6 +372,14 @@ export interface SystemCheck {
   optional: boolean;
 }
 
+export interface LoginStatus {
+  state: "idle" | "running" | "done" | "error";
+  message: string;
+  auth_url: string | null;
+  prompt: string | null;
+  output: string;
+}
+
 export interface AuthCheck {
   auth_mode: AuthMode;
   model: string;

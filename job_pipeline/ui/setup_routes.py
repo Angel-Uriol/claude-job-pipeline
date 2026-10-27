@@ -22,6 +22,7 @@ from .. import paths
 from ..config import LLMSettings, load_config, load_secrets
 from ..llm import ClaudeClient, LLMError, build_llm, llm_available, self_check
 from ..llm.cli_client import describe_cli
+from ..onboarding import login as claude_login
 from ..onboarding.companies import suggest_companies, verify_companies
 from ..onboarding.env_file import mask, set_env_values
 from ..onboarding.interview import (
@@ -32,7 +33,7 @@ from ..onboarding.interview import (
     step,
 )
 from ..onboarding.resume_intake import parse_resume_file
-from ..onboarding.system import install, open_login_terminal, system_checks
+from ..onboarding.system import install, system_checks
 from ..onboarding.writer import build_files, write_files
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
@@ -46,6 +47,10 @@ class AuthBody(BaseModel):
 
 class InstallBody(BaseModel):
     component: Literal["renderer", "claude_cli"]
+
+
+class LoginInputBody(BaseModel):
+    text: str
 
 
 class InterviewBody(BaseModel):
@@ -121,9 +126,23 @@ def register_setup_routes(app: FastAPI) -> None:
         result["checks"] = await asyncio.to_thread(system_checks, s.claude_cli_path)
         return result
 
-    @app.post("/api/setup/login-terminal")
-    async def setup_login_terminal() -> dict[str, Any]:
-        return await asyncio.to_thread(open_login_terminal, load_secrets().claude_cli_path)
+    # One-click "Log in with Claude": runs `claude setup-token` server-side and
+    # captures the token (see onboarding/login.py). The page polls /status.
+    @app.post("/api/setup/login/start")
+    async def setup_login_start() -> dict[str, Any]:
+        return await asyncio.to_thread(claude_login.start, load_secrets().claude_cli_path)
+
+    @app.get("/api/setup/login/status")
+    async def setup_login_status() -> dict[str, Any]:
+        return claude_login.status()
+
+    @app.post("/api/setup/login/input")
+    async def setup_login_input(body: LoginInputBody) -> dict[str, Any]:
+        return claude_login.send(body.text)
+
+    @app.post("/api/setup/login/cancel")
+    async def setup_login_cancel() -> dict[str, Any]:
+        return claude_login.cancel()
 
     @app.post("/api/setup/auth")
     async def setup_auth(body: AuthBody) -> dict[str, Any]:

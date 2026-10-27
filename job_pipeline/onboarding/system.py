@@ -7,16 +7,14 @@ this covers the rest, each installable with one click on the Setup page:
 * Claude Code CLI  — Anthropic's official native installer; only needed for
                      "My Claude Code login" mode
 
-Logging the CLI in is interactive (`claude setup-token` opens a browser and
-prints a token), so we can't do it from a web request. `open_login_terminal`
-opens a Terminal window running it; the user pastes the token on the page.
+Logging the CLI in is handled separately by onboarding/login.py (one-click
+"Log in with Claude").
 """
 
 from __future__ import annotations
 
 import os
 import platform
-import shlex
 import shutil
 import subprocess
 from pathlib import Path
@@ -92,24 +90,3 @@ def install(component: str) -> dict[str, Any]:
             os.environ["PATH"] = local_bin + os.pathsep + os.environ.get("PATH", "")
         return result
     return {"ok": False, "log": f"Unknown component {component!r}."}
-
-
-def open_login_terminal(cli_path: str = "") -> dict[str, Any]:
-    """Open a terminal running `claude setup-token` (macOS); else return the command."""
-    cli = resolve_claude_cli(cli_path)
-    if not cli:
-        return {"opened": False, "command": None,
-                "detail": "Install the Claude Code CLI first."}
-    command = f"{shlex.quote(cli)} setup-token"
-    if platform.system() == "Darwin" and shutil.which("osascript"):
-        escaped = command.replace("\\", "\\\\").replace('"', '\\"')  # AppleScript string
-        script = f'tell application "Terminal" to do script "{escaped}"'
-        proc = subprocess.run(["osascript", "-e", script, "-e",
-                               'tell application "Terminal" to activate'],
-                              capture_output=True, text=True, check=False)
-        if proc.returncode == 0:
-            return {"opened": True, "command": command,
-                    "detail": "Follow the browser login, then copy the sk-ant-oat… token "
-                              "Terminal prints and paste it below."}
-    return {"opened": False, "command": command,
-            "detail": "Run this in a terminal, log in, then paste the printed token below."}

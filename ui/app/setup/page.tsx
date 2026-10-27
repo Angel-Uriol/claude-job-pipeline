@@ -20,6 +20,7 @@ import type {
   SetupInterview,
   SetupStatus,
   SystemCheck,
+  LoginStatus,
 } from "@/lib/types";
 
 type Step = 0 | 1 | 2 | 3 | 4 | 5;
@@ -285,7 +286,6 @@ function AuthStep({
   const [mode, setMode] = useState<AuthMode>(status.auth.mode);
   const [key, setKey] = useState("");
   const [token, setToken] = useState("");
-  const [loginHint, setLoginHint] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
 
@@ -359,27 +359,16 @@ function AuthStep({
               <>✗ Claude Code CLI not found. Install it from claude.com/claude-code.</>
             )}
           </p>
-          <p>
-            Make sure it&apos;s logged in: run <code>claude</code> in a terminal and use{" "}
-            <code>/login</code>. Or, more reliably, run <code>claude setup-token</code> and paste the
-            token it prints below.
-          </p>
-          <button
-            type="button"
-            className={BTN_GHOST}
-            disabled={!status.auth.cli.cli_found}
-            onClick={async () => {
-              try {
-                const r = await api.setupLoginTerminal();
-                setLoginHint(r.opened ? r.detail : `${r.detail}  →  ${r.command ?? ""}`);
-              } catch (e) {
-                onError(errText(e));
-              }
-            }}
-          >
-            Get a login token (opens Terminal)
-          </button>
-          {loginHint && <p className="text-xs text-indigo-600 dark:text-indigo-300">{loginHint}</p>}
+          <ClaudeLogin
+            disabled={!status.auth.cli.cli_found || busy}
+            onError={onError}
+            onLoggedIn={() => void connect()}
+          />
+          <details className="text-sm">
+            <summary className="cursor-pointer text-xs text-slate-500">Paste a token manually instead</summary>
+            <p className="mt-2 text-xs text-slate-500">
+              Run <code>claude setup-token</code> in a terminal, then paste the <code>sk-ant-oat…</code> token it prints.
+            </p>
           <div>
             <label className="text-xs font-semibold text-slate-600 dark:text-slate-300" htmlFor="oauth-token">
               Token from <code>claude setup-token</code>{" "}
@@ -398,6 +387,7 @@ function AuthStep({
             />
             <p className="mt-1 text-xs text-slate-400">Saved only to <code>.env</code> in this folder (never committed).</p>
           </div>
+          </details>
           <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
             For personal use on your own machine only. Anthropic&apos;s terms ask third-party tools to use
             API keys rather than claude.ai logins, so don&apos;t host this app for other people in this mode.
@@ -412,6 +402,128 @@ function AuthStep({
         {result && <span className="text-sm text-emerald-600 dark:text-emerald-400">{result}</span>}
       </div>
     </section>
+  );
+}
+
+// One-click login: the backend runs `claude setup-token`, the browser opens
+// for the Claude login, and the token is captured + saved automatically.
+function ClaudeLogin({
+  disabled,
+  onError,
+  onLoggedIn,
+}: {
+  disabled: boolean;
+  onError: (m: string | null) => void;
+  onLoggedIn: () => void;
+}) {
+  const [login, setLogin] = useState<LoginStatus | null>(null);
+  const [code, setCode] = useState("");
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const done = useRef(false);
+
+  const stopPolling = () => {
+    if (timer.current) clearInterval(timer.current);
+    timer.current = null;
+  };
+
+  const poll = useCallback(() => {
+    stopPolling();
+    timer.current = setInterval(async () => {
+      try {
+        const s = await api.setupLoginStatus();
+        setLogin(s);
+        if (s.state !== "running") stopPolling();
+        if (s.state === "done" && !done.current) {
+          done.current = true;
+          onLoggedIn();
+        }
+      } catch (e) {
+        stopPolling();
+        onError(errText(e));
+      }
+    }, 1500);
+  }, [onError, onLoggedIn]);
+
+  useEffect(() => stopPolling, []);
+
+  const start = async () => {
+    onError(null);
+    done.current = false;
+    try {
+      setLogin(await api.setupLoginStart());
+      poll();
+    } catch (e) {
+      onError(errText(e));
+    }
+  };
+
+  const running = login?.state === "running";
+
+  return (
+    <div className="space-y-2 rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" className={BTN} disabled={disabled || running} onClick={() => void start()}>
+          {running ? "Waiting for login…" : login?.state === "done" ? "Logged in ✓" : "Log in with Claude"}
+        </button>
+        {running && (
+          <button
+            type="button"
+            className="text-xs text-slate-500 underline"
+            onClick={async () => {
+              stopPolling();
+              setLogin(await api.setupLoginCancel());
+            }}
+          >
+            cancel
+          </button>
+        )}
+      </div>
+      <p className="text-xs text-slate-500 dark:text-slate-400">
+        Opens your browser to log in to your Claude account. When the page says “You’re all set”, come
+        back here — this page continues by itself.
+      </p>
+      {login?.message && (
+        <p
+          className={`text-xs ${
+            login.state === "error" ? "text-rose-600" : login.state === "done" ? "text-emerald-600" : "text-indigo-600 dark:text-indigo-300"
+          }`}
+        >
+          {login.message}
+        </p>
+      )}
+      {running && login?.auth_url && (
+        <p className="text-xs">
+          Browser didn&apos;t open?{" "}
+          <a href={login.auth_url} target="_blank" rel="noreferrer" className="text-indigo-600 underline">
+            Open the login page
+          </a>
+        </p>
+      )}
+      {running && login?.prompt && (
+        <form
+          className="flex gap-2"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setLogin(await api.setupLoginInput(code));
+            setCode("");
+          }}
+        >
+          <input
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            placeholder={login.prompt}
+            className={INPUT}
+            aria-label="Code from the browser"
+          />
+          <button type="submit" className={BTN_GHOST} disabled={!code.trim()}>
+            Send
+          </button>
+        </form>
+      )}
+      {login?.state === "error" && login.output && (
+        <pre className="max-h-40 overflow-auto rounded-lg bg-slate-950 p-3 text-[11px] text-slate-200">{login.output}</pre>
+      )}
+    </div>
   );
 }
 

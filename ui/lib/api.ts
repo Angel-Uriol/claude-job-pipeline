@@ -27,6 +27,7 @@ import type {
   SetupStatus,
   StateResponse,
   SystemCheck,
+  LoginStatus,
   TaskStatusResponse,
   TrackerJobsResponse,
   TrackerStats,
@@ -92,11 +93,14 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ component }),
     }),
-  setupLoginTerminal: () =>
-    request<{ opened: boolean; command: string | null; detail: string }>(
-      "/api/setup/login-terminal",
-      { method: "POST" },
-    ),
+  setupLoginStart: () => request<LoginStatus>("/api/setup/login/start", { method: "POST" }),
+  setupLoginStatus: () => request<LoginStatus>("/api/setup/login/status"),
+  setupLoginInput: (text: string) =>
+    request<LoginStatus>("/api/setup/login/input", {
+      method: "POST",
+      body: JSON.stringify({ text }),
+    }),
+  setupLoginCancel: () => request<LoginStatus>("/api/setup/login/cancel", { method: "POST" }),
   setupAuth: (mode: AuthMode, apiKey = "", oauthToken = "") =>
     request<AuthCheck>("/api/setup/auth", {
       method: "POST",
