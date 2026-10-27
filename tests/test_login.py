@@ -17,7 +17,8 @@ printf '\\033[1mOpening browser to sign in…\\033[0m\\r\\n'
 printf 'If it did not open, visit: https://claude.ai/oauth/authorize?code=true&x=1\\r\\n'
 sleep 1
 printf '\\033[32m✓ Long-lived authentication token created:\\033[0m\\r\\n\\r\\n'
-printf 'sk-ant-oat01-ABCdef_123-xyzXYZ0987654321abcdEFGH\\r\\n'
+# One write, like the real CLI's full-screen redraw: token + the next line.
+printf 'sk-ant-oat01-ABCdef_123-xyzXYZ0987654321abcdEFGH\\r\\nStore\\033[1Cthis\\033[1Ctoken\\033[1Csecurely.\\r\\n'
 sleep 30
 """
 
@@ -51,7 +52,9 @@ def test_login_captures_token_and_saves_env(
     assert "sk-ant-oat01-ABCdef_123-xyzXYZ0987654321abcdEFGH" not in str(s)  # never leaked
     assert "saved" in str(s["message"])
     text = env.read_text()
-    assert "CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-ABCdef_123-xyzXYZ0987654321abcdEFGH" in text
+    # Exact line: nothing from the following "Store this token…" line glued on.
+    assert "CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-ABCdef_123-xyzXYZ0987654321abcdEFGH" \
+        in text.splitlines()
     assert "JOB_PIPELINE_AUTH_MODE=claude_code" in text
 
 

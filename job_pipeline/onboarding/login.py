@@ -29,7 +29,11 @@ from typing import Any
 from ..llm.cli_client import resolve_claude_cli
 from .env_file import mask, set_env_values
 
-TOKEN_RE = re.compile(r"sk-ant-oat[0-9A-Za-z_\-]{20,}")
+# Token chars only, bounded on both sides so neighbouring words never get
+# glued on (the CLI prints "Store this token securely…" right after it).
+TOKEN_RE = re.compile(r"(?<![0-9A-Za-z_\-])sk-ant-oat[0-9A-Za-z_\-]{20,}(?![0-9A-Za-z_\-])")
+# Cursor-forward (ESC[nC) is how terminal UIs draw spaces — keep it a space.
+CURSOR_FWD_RE = re.compile(r"\x1b\[\d*C")
 URL_RE = re.compile(r"https://[^\s\"'<>]+")
 ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07]*(\x07|\x1b\\)|\x1b[@-_]")
 TIMEOUT_SECONDS = 600
@@ -38,6 +42,7 @@ COLUMNS, ROWS = 400, 50
 
 
 def _clean(text: str) -> str:
+    text = CURSOR_FWD_RE.sub(" ", text)
     text = ANSI_RE.sub("", text).replace("\r", "\n")
     return re.sub(r"\n{3,}", "\n\n", text)
 
@@ -96,7 +101,10 @@ def _reader() -> None:
                 break
             raw += chunk.decode("utf-8", errors="replace")
             text = _clean(raw)
-            token = TOKEN_RE.search(text.replace("\n", ""))
+            # Search line by line — never join lines (that glued the next
+            # line's words onto the token). The pty is 400 columns wide, so
+            # the token is always printed on a single line.
+            token = TOKEN_RE.search(text)
             with _S.lock:
                 if token:
                     set_env_values({
