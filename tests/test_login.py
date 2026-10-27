@@ -18,7 +18,8 @@ printf 'If it did not open, visit: https://claude.ai/oauth/authorize?code=true&x
 sleep 1
 printf '\\033[32m✓ Long-lived authentication token created:\\033[0m\\r\\n\\r\\n'
 # One write, like the real CLI's full-screen redraw: token + the next line.
-printf 'sk-ant-oat01-ABCdef_123-xyzXYZ0987654321abcdEFGH\\r\\nStore\\033[1Cthis\\033[1Ctoken\\033[1Csecurely.\\r\\n'
+TOK='sk-ant-oat01-ABCdef_123-xyzXYZ0987654321abcdEFGH'
+printf "$TOK\\r\\nStore\\033[1Cthis\\033[1Ctoken\\033[1Csecurely.\\r\\n"
 sleep 30
 """
 
