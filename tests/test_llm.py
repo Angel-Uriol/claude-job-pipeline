@@ -136,3 +136,13 @@ def test_scrub_process_env_removes_api_key(monkeypatch: pytest.MonkeyPatch) -> N
     assert scrub_process_env() is True
     assert "ANTHROPIC_API_KEY" not in os.environ
     assert "CLAUDECODE" not in os.environ
+
+
+def test_claude_code_client_passes_setup_token_to_child(monkeypatch: pytest.MonkeyPatch) -> None:
+    import job_pipeline.llm.cli_client as cc
+
+    monkeypatch.setattr(cc, "resolve_claude_cli", lambda _p="": "/opt/bin/claude")
+    monkeypatch.setattr(cc, "scrub_process_env", lambda: False)
+    env = cc.ClaudeCodeClient(oauth_token="sk-ant-oat01-abc")._child_env()
+    assert env["CLAUDE_CODE_OAUTH_TOKEN"] == "sk-ant-oat01-abc"
+    assert env["PATH"].startswith("/opt/bin")

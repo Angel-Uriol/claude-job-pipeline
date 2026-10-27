@@ -1,4 +1,5 @@
-// Setup — first-run wizard. Five steps, each backed by /api/setup/*:
+// Setup — first-run wizard. Six steps, each backed by /api/setup/*:
+//   0. Install            one-click install of the resume renderer + Claude Code CLI
 //   1. Connect Claude     API key (default) or your local Claude Code login
 //   2. Resume             upload → Claude parses it into resume_content
 //   3. Questionnaire      Claude interviews you until the profile is complete
@@ -13,11 +14,18 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ApiError, api } from "@/lib/api";
-import type { AuthMode, SetupCompany, SetupInterview, SetupStatus } from "@/lib/types";
+import type {
+  AuthMode,
+  SetupCompany,
+  SetupInterview,
+  SetupStatus,
+  SystemCheck,
+} from "@/lib/types";
 
-type Step = 1 | 2 | 3 | 4 | 5;
+type Step = 0 | 1 | 2 | 3 | 4 | 5;
 
 const STEPS: { n: Step; label: string }[] = [
+  { n: 0, label: "Install" },
   { n: 1, label: "Connect Claude" },
   { n: 2, label: "Resume" },
   { n: 3, label: "Questionnaire" },
@@ -39,8 +47,9 @@ function errText(e: unknown): string {
 }
 
 /** Pick the first step that still needs doing. */
-function firstOpenStep(s: SetupStatus): Step {
-  if (!s.auth.connected) return 1;
+function firstOpenStep(s: SetupStatus, checks: SystemCheck[]): Step {
+  if (checks.some((c) => !c.ok && !c.optional)) return 0;
+  if (!s.auth.connected) return checks.every((c) => c.ok) ? 1 : 0;
   const iv = s.interview;
   if (!iv.resume.parsed && iv.messages.length === 0) return 2;
   if (!iv.done) return 3;
@@ -69,7 +78,9 @@ export default function SetupPage() {
   useEffect(() => {
     // Initial load; setState happens after an await.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void load().then((s) => s && setStep(firstOpenStep(s)));
+    void Promise.all([load(), api.setupSystem().catch(() => ({ checks: [] }))]).then(
+      ([s, sys]) => s && setStep(firstOpenStep(s, sys.checks)),
+    );
   }, [load]);
 
   if (!status || !interview) {
@@ -100,7 +111,7 @@ export default function SetupPage() {
                   : "bg-slate-200 text-slate-600 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-300"
               }`}
             >
-              {s.n}. {s.label}
+              {s.n + 1}. {s.label}
             </button>
           </li>
         ))}
@@ -116,6 +127,7 @@ export default function SetupPage() {
       )}
 
       <div className="mt-6">
+        {step === 0 && <InstallStep onError={setError} onNext={() => setStep(1)} />}
         {step === 1 && (
           <AuthStep
             status={status}
@@ -158,6 +170,107 @@ export default function SetupPage() {
   );
 }
 
+// ===== step 0: install =====
+
+function InstallStep({
+  onError,
+  onNext,
+}: {
+  onError: (m: string | null) => void;
+  onNext: () => void;
+}) {
+  const [checks, setChecks] = useState<SystemCheck[] | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [log, setLog] = useState<string | null>(null);
+
+  useEffect(() => {
+    api
+      .setupSystem()
+      .then((r) => setChecks(r.checks))
+      .catch((e) => onError(errText(e)));
+  }, [onError]);
+
+  const installOne = async (c: SystemCheck) => {
+    setBusy(c.id);
+    onError(null);
+    try {
+      const r = await api.setupInstall(c.id);
+      setChecks(r.checks);
+      if (!r.ok) {
+        onError(`Installing ${c.label} failed — see the log below.`);
+        setLog(r.log);
+      }
+      return r.ok;
+    } catch (e) {
+      onError(errText(e));
+      return false;
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const installAll = async () => {
+    setLog(null);
+    for (const c of checks ?? []) {
+      if (c.installable && !(await installOne(c))) return;
+    }
+  };
+
+  const missing = (checks ?? []).filter((c) => c.installable);
+  const blocking = (checks ?? []).some((c) => !c.ok && !c.optional);
+
+  return (
+    <section className={CARD}>
+      <h2 className="text-lg font-semibold">Install what&apos;s needed</h2>
+      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+        One click sets up the pieces the pipeline uses on this computer. The Claude Code CLI is only
+        needed if you want to use your Claude login instead of an API key.
+      </p>
+
+      {checks === null ? (
+        <p className="mt-4 text-sm text-slate-400">Checking this machine…</p>
+      ) : (
+        <ul className="mt-4 divide-y divide-slate-100 dark:divide-slate-800">
+          {checks.map((c) => (
+            <li key={c.id} className="flex items-center gap-3 py-3">
+              <span className={`text-lg ${c.ok ? "text-emerald-600" : c.optional ? "text-amber-500" : "text-rose-600"}`}>
+                {c.ok ? "✓" : c.optional ? "○" : "✗"}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold">
+                  {c.label}
+                  {c.optional && !c.ok && <span className="ml-2 text-xs font-normal text-slate-400">optional</span>}
+                </div>
+                <div className="break-all text-xs text-slate-500 dark:text-slate-400">{c.detail}</div>
+              </div>
+              {c.installable && (
+                <button type="button" className={BTN_GHOST} disabled={busy !== null} onClick={() => void installOne(c)}>
+                  {busy === c.id ? "Installing…" : "Install"}
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {log && (
+        <pre className="mt-3 max-h-48 overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-slate-100">{log}</pre>
+      )}
+
+      <div className="mt-5 flex flex-wrap gap-3">
+        {missing.length > 0 && (
+          <button type="button" className={BTN} disabled={busy !== null} onClick={() => void installAll()}>
+            {busy ? "Installing… (can take a minute)" : `Install missing (${missing.length})`}
+          </button>
+        )}
+        <button type="button" className={missing.length ? BTN_GHOST : BTN} disabled={blocking || busy !== null} onClick={onNext}>
+          Continue →
+        </button>
+      </div>
+    </section>
+  );
+}
+
 // ===== step 1: connect Claude =====
 
 function AuthStep({
@@ -171,6 +284,8 @@ function AuthStep({
 }) {
   const [mode, setMode] = useState<AuthMode>(status.auth.mode);
   const [key, setKey] = useState("");
+  const [token, setToken] = useState("");
+  const [loginHint, setLoginHint] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
 
@@ -179,10 +294,11 @@ function AuthStep({
     onError(null);
     setResult(null);
     try {
-      const check = await api.setupAuth(mode, key.trim());
+      const check = await api.setupAuth(mode, key.trim(), token.trim());
       if (check.ok) {
         setResult(`✓ ${check.detail}`);
         setKey("");
+        setToken("");
         onDone();
       } else {
         onError(check.detail);
@@ -243,7 +359,45 @@ function AuthStep({
               <>✗ Claude Code CLI not found. Install it from claude.com/claude-code.</>
             )}
           </p>
-          <p>Make sure it&apos;s logged in: run <code>claude</code> in a terminal once and use <code>/login</code>.</p>
+          <p>
+            Make sure it&apos;s logged in: run <code>claude</code> in a terminal and use{" "}
+            <code>/login</code>. Or, more reliably, run <code>claude setup-token</code> and paste the
+            token it prints below.
+          </p>
+          <button
+            type="button"
+            className={BTN_GHOST}
+            disabled={!status.auth.cli.cli_found}
+            onClick={async () => {
+              try {
+                const r = await api.setupLoginTerminal();
+                setLoginHint(r.opened ? r.detail : `${r.detail}  →  ${r.command ?? ""}`);
+              } catch (e) {
+                onError(errText(e));
+              }
+            }}
+          >
+            Get a login token (opens Terminal)
+          </button>
+          {loginHint && <p className="text-xs text-indigo-600 dark:text-indigo-300">{loginHint}</p>}
+          <div>
+            <label className="text-xs font-semibold text-slate-600 dark:text-slate-300" htmlFor="oauth-token">
+              Token from <code>claude setup-token</code>{" "}
+              <span className="font-normal text-slate-400">
+                (optional{status.auth.cli.oauth_token_env ? " — one is saved; leave blank to keep it" : ""})
+              </span>
+            </label>
+            <input
+              id="oauth-token"
+              type="password"
+              autoComplete="off"
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              placeholder="sk-ant-oat…"
+              className={`mt-1 ${INPUT}`}
+            />
+            <p className="mt-1 text-xs text-slate-400">Saved only to <code>.env</code> in this folder (never committed).</p>
+          </div>
           <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
             For personal use on your own machine only. Anthropic&apos;s terms ask third-party tools to use
             API keys rather than claude.ai logins, so don&apos;t host this app for other people in this mode.

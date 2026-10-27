@@ -108,7 +108,7 @@ def test_run_scrape_no_scrapers_configured(tmp_path: Path) -> None:
 
     assert counts == {
         "inserted": 0, "updated": 0, "excluded": 0,
-        "filtered": 0, "errors": 0, "deduped": 0, "seen_skipped": 0,
+        "filtered": 0, "errors": 0, "deduped": 0, "seen_skipped": 0, "already_tracked": 0,
     }
     assert any("No scrapers configured" in e.message for e in coll.events)
 
@@ -706,7 +706,7 @@ def test_run_jsearch_skips_when_no_queries(tmp_path: Path) -> None:
     counts = run_jsearch(cfg, store, secrets=Secrets(JSEARCH_API_KEY="x"), progress=coll)
     assert counts == {
         "inserted": 0, "updated": 0, "excluded": 0, "filtered": 0,
-        "errors": 0, "deduped": 0, "requests": 0, "seen_skipped": 0,
+        "errors": 0, "deduped": 0, "requests": 0, "seen_skipped": 0, "already_tracked": 0,
     }
     assert any("No JSearch queries configured" in e.message for e in coll.events)
 

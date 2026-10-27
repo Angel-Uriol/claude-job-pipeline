@@ -26,6 +26,7 @@ import type {
   SetupInterview,
   SetupStatus,
   StateResponse,
+  SystemCheck,
   TaskStatusResponse,
   TrackerJobsResponse,
   TrackerStats,
@@ -85,10 +86,21 @@ export const api = {
 
   // ===== Setup page (first run) =====
   setupStatus: () => request<SetupStatus>("/api/setup/status"),
-  setupAuth: (mode: AuthMode, apiKey = "") =>
+  setupSystem: () => request<{ checks: SystemCheck[] }>("/api/setup/system"),
+  setupInstall: (component: SystemCheck["id"]) =>
+    request<{ ok: boolean; log: string; checks: SystemCheck[] }>("/api/setup/install", {
+      method: "POST",
+      body: JSON.stringify({ component }),
+    }),
+  setupLoginTerminal: () =>
+    request<{ opened: boolean; command: string | null; detail: string }>(
+      "/api/setup/login-terminal",
+      { method: "POST" },
+    ),
+  setupAuth: (mode: AuthMode, apiKey = "", oauthToken = "") =>
     request<AuthCheck>("/api/setup/auth", {
       method: "POST",
-      body: JSON.stringify({ mode, api_key: apiKey }),
+      body: JSON.stringify({ mode, api_key: apiKey, oauth_token: oauthToken }),
     }),
   /** Multipart upload — no JSON content-type, so not via `request`. */
   setupResume: async (file: File): Promise<SetupInterview> => {

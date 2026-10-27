@@ -94,12 +94,13 @@ def cmd_scrape(args: argparse.Namespace) -> int:
     store.save()
     log.info(
         "Scrape done: inserted=%d updated=%d filtered=%d excluded=%d "
-        "deduped=%d errors=%d",
+        "deduped=%d already_tracked=%d errors=%d",
         counts["inserted"],
         counts["updated"],
         counts["filtered"],
         counts["excluded"],
         counts.get("deduped", 0),
+        counts.get("already_tracked", 0),
         counts["errors"],
     )
     return 0
@@ -237,14 +238,18 @@ def cmd_import(args: argparse.Namespace) -> int:
     store = JobStore(cfg.paths.jobs_json, excluded_companies=cfg.excluded_companies)
     store.load()
 
-    stats = import_chrome_claude_jsonl(input_path, store)
+    from .applied_guard import load_tracked_index
+
+    stats = import_chrome_claude_jsonl(input_path, store, tracked=load_tracked_index(cfg))
     store.save()
 
     log.info(
-        "Import done: inserted=%d updated=%d excluded=%d malformed=%d (total seen=%d)",
+        "Import done: inserted=%d updated=%d excluded=%d already_tracked=%d "
+        "malformed=%d (total seen=%d)",
         stats.inserted,
         stats.updated,
         stats.excluded,
+        stats.already_tracked,
         stats.skipped_malformed,
         stats.total_seen,
     )

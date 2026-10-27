@@ -222,3 +222,63 @@ def test_pipeline_routes_return_409_before_setup(client: TestClient) -> None:
     assert res.status_code == 409
     assert "setup" in res.json()["detail"].lower()
     assert res.headers.get("access-control-allow-origin") == "http://localhost:8766"
+
+
+def test_setup_auth_claude_code_saves_token(
+    client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import job_pipeline.ui.setup_routes as sr
+
+    monkeypatch.setattr(sr, "self_check", lambda model: {"ok": True, "detail": "ok"})
+    bad = client.post("/api/setup/auth", json={"mode": "claude_code", "oauth_token": "nope"})
+    assert bad.status_code == 400
+    ok = client.post(
+        "/api/setup/auth", json={"mode": "claude_code", "oauth_token": "sk-ant-oat01-xyz"}
+    )
+    assert ok.status_code == 200
+    env = (tmp_path / ".env").read_text()
+    assert "JOB_PIPELINE_AUTH_MODE=claude_code" in env
+    assert "CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-xyz" in env
+
+
+# --- install step ------------------------------------------------------------
+
+
+def test_system_checks_shape() -> None:
+    from job_pipeline.onboarding.system import system_checks
+
+    checks = {c["id"]: c for c in system_checks()}
+    assert set(checks) == {"node", "renderer", "claude_cli"}
+    assert checks["claude_cli"]["optional"] is True
+
+
+def test_install_unknown_component() -> None:
+    from job_pipeline.onboarding.system import install
+
+    assert install("nope")["ok"] is False
+
+
+def test_install_claude_cli_uses_official_installer(monkeypatch: pytest.MonkeyPatch) -> None:
+    import job_pipeline.onboarding.system as sysmod
+
+    seen: list[Any] = []
+    monkeypatch.setattr(sysmod, "_run", lambda cmd, **kw: seen.append(cmd) or {"ok": True,
+                                                                              "log": ""})
+    monkeypatch.setattr(sysmod.platform, "system", lambda: "Darwin")
+    assert sysmod.install("claude_cli")["ok"] is True
+    assert seen == [sysmod.CLAUDE_INSTALL_UNIX]
+
+
+def test_resolve_cli_prefers_real_install_over_execpath(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import job_pipeline.llm.cli_client as cc
+
+    bundled = tmp_path / "bundled-claude"
+    bundled.write_text("")
+    monkeypatch.setenv("CLAUDE_CODE_EXECPATH", str(bundled))
+    monkeypatch.setattr(cc.shutil, "which", lambda _n: "/usr/local/bin/claude")
+    assert cc.resolve_claude_cli() == "/usr/local/bin/claude"
+    monkeypatch.setattr(cc.shutil, "which", lambda _n: None)
+    monkeypatch.setattr(cc.Path, "home", lambda: tmp_path / "home")
+    assert cc.resolve_claude_cli() == str(bundled)

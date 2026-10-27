@@ -31,19 +31,19 @@ You need **Python 3.11+**, **Node 20+** and **[uv](https://docs.astral.sh/uv/)**
 ```bash
 git clone https://github.com/Angel-Uriol/claude-job-pipeline.git
 cd claude-job-pipeline
-make install
-make dev
+make start          # installs what's missing, then starts the app
 ```
 
 Open **http://localhost:8766**. The first visit takes you to the **Setup** page:
 
 | Step | What happens |
 |---|---|
-| 1. Connect Claude | Paste an Anthropic API key, **or** use your local Claude Code login (see below). |
-| 2. Resume | Upload a PDF, DOCX or TXT. Claude parses it into `profile/resume_content.yaml`. |
-| 3. Questionnaire | Claude interviews you one question at a time: target roles (ranked), level, locations/remote, work authorization, core skills, honest gaps, deal-breakers, dream companies. |
-| 4. Companies | Claude suggests 20–40 employers that fit you; you prune or add, and the app checks which have a public job board. |
-| 5. Review & save | See the three generated YAML files, then save. |
+| 1. Install | One click installs what's still missing: the resume renderer, and (optionally) the Claude Code CLI via Anthropic's official installer. |
+| 2. Connect Claude | Paste an Anthropic API key, **or** use your local Claude Code login (see below). |
+| 3. Resume | Upload a PDF, DOCX or TXT. Claude parses it into `profile/resume_content.yaml`. |
+| 4. Questionnaire | Claude interviews you one question at a time: target roles (ranked), level, locations/remote, work authorization, core skills, honest gaps, deal-breakers, dream companies. |
+| 5. Companies | Claude suggests 20–40 employers that fit you; you prune or add, and the app checks which have a public job board. |
+| 6. Review & save | See the three generated YAML files, then save. |
 
 Then go to **Discover** and press **Run daily**.
 
@@ -61,7 +61,7 @@ uv run job-pipeline daily     # scrape → pre-filter → deep-fit → digest �
 | Mode | How | Best for |
 |---|---|---|
 | **API key** (default) | Create a key at [console.anthropic.com](https://console.anthropic.com/settings/keys) and paste it on the Setup page. It's saved to `.env`, which is gitignored. | Everyone. Pay-as-you-go. |
-| **Claude Code login** | Install [Claude Code](https://claude.com/claude-code) and run `claude` once to log in. The app drives that CLI through the [Claude Agent SDK](https://docs.claude.com/en/docs/agent-sdk/overview), so you don't paste a key. | Running the tool for yourself, on your own machine. |
+| **Claude Code login** | Click **Install** on step 1 (or install [Claude Code](https://claude.com/claude-code) yourself), then **Get a login token**: it opens a terminal running `claude setup-token`, and you paste the token it prints. The app drives that CLI through the [Claude Agent SDK](https://docs.claude.com/en/docs/agent-sdk/overview), so you don't paste a key. | Running the tool for yourself, on your own machine. |
 
 > **About Claude Code login mode:** Anthropic's terms ask third-party tools to use
 > API keys rather than claude.ai logins. This mode exists so you can run this
@@ -114,6 +114,17 @@ job_pipeline/
   ui/                       FastAPI backend (incl. setup_routes.py)
 ui/                         Next.js frontend: Discover, Track, Setup
 ```
+
+## Already applied? It won't come back
+
+The Track tab is the record of what you've acted on, and the pipeline respects it:
+- Scrapes, open-web search and Chrome Claude imports **skip any job already in
+  your tracker**. That includes re-posts of the same role at the same company
+  under a new job ID.
+- Moving a job to *applied*, *rejected* or *withdrawn* on the Track tab updates
+  the matching Discover row, so it leaves your inbox.
+- Jobs you dismiss in Discover are remembered too (`data/seen_jobs.json`), so a
+  later scrape doesn't bring them back.
 
 ## The scoring rubric
 

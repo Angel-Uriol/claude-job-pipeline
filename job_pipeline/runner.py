@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     # runner module at import time (resume rendering is invoked lazily).
     from .resume import ResumeTailorer
 
+from .applied_guard import load_tracked_index, sync_statuses
 from .config import Config, Secrets
 from .digest import build_chrome_prompts_for_config, build_digest_html
 from .llm import ClaudeClient, build_llm
@@ -122,6 +123,7 @@ def run_scrape(
         "errors": 0,
         "deduped": 0,
         "seen_skipped": 0,
+        "already_tracked": 0,
     }
 
     # Seen-ledger: skip postings the user already reviewed (even if their row
@@ -130,6 +132,11 @@ def run_scrape(
     ledger = SeenLedger(ledger_path_for(cfg.paths.jobs_json))
     ledger.load()
     store_keys: set[tuple[str, str]] = {j.dedup_key() for j in store.jobs}
+
+    # Applied guard: jobs already in your tracker (incl. re-posts of the same
+    # role) never come back, and Track-tab progress flows into Discover.
+    tracked = load_tracked_index(cfg)
+    counts["already_tracked"] += sync_statuses(store.jobs, tracked)
 
     # Target-company overlay: flag jobs from your target_companies.yaml list.
     target_index = default_target_index()
@@ -192,6 +199,10 @@ def run_scrape(
             # the store's own dedup, e.g. dismissed tombstones.)
             if key not in store_keys and ledger.contains(key):
                 counts["seen_skipped"] += 1
+                continue
+            if key not in store_keys and tracked.match(job) is not None:
+                counts["already_tracked"] += 1
+                ledger.add(key)
                 continue
             result = apply_filters(job, cfg)
             if not result.passed:
@@ -332,6 +343,7 @@ def run_jsearch(
         "errors": 0,
         "deduped": 0,
         "seen_skipped": 0,
+        "already_tracked": 0,
         "requests": 0,
     }
 
@@ -350,6 +362,11 @@ def run_jsearch(
     ledger = SeenLedger(ledger_path_for(cfg.paths.jobs_json))
     ledger.load()
     store_keys: set[tuple[str, str]] = {j.dedup_key() for j in store.jobs}
+
+    # Applied guard: jobs already in your tracker (incl. re-posts of the same
+    # role) never come back, and Track-tab progress flows into Discover.
+    tracked = load_tracked_index(cfg)
+    counts["already_tracked"] += sync_statuses(store.jobs, tracked)
 
     # Target-company overlay: flag jobs from your target_companies.yaml list.
     target_index = default_target_index()
@@ -420,6 +437,10 @@ def run_jsearch(
                 key = job.dedup_key()
                 if key not in store_keys and ledger.contains(key):
                     counts["seen_skipped"] += 1
+                    continue
+                if key not in store_keys and tracked.match(job) is not None:
+                    counts["already_tracked"] += 1
+                    ledger.add(key)
                     continue
                 result = apply_filters(job, cfg)
                 if not result.passed:

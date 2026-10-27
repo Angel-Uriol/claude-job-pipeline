@@ -22,6 +22,11 @@ os.environ["JOB_PIPELINE_PROFILE_DIR"] = str(EXAMPLE_PROFILE)
 os.environ["JOB_PIPELINE_AUTH_MODE"] = "api_key"
 os.environ["ANTHROPIC_API_KEY"] = ""
 
+from job_pipeline import paths  # noqa: E402
+
+# Never read the developer's real .env (it may hold a key or another auth mode).
+paths.ENV_FILE = REPO / "tests" / "fixtures" / "no-such.env"
+
 from job_pipeline.models import Job, Source  # noqa: E402
 from job_pipeline.store import JobStore  # noqa: E402
 

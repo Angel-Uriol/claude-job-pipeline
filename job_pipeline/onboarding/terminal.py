@@ -65,7 +65,11 @@ def run_auth(mode: str | None = None) -> int:
             return 1
     else:
         print("\n" + TERMS_NOTE + "\n")
-        print("Make sure the CLI is installed and logged in: run `claude` once and use /login.")
+        print("Make sure the CLI is logged in (run `claude`, then /login) — or run "
+              "`claude setup-token` and paste the token below.")
+        token = getpass.getpass("setup-token (input hidden; Enter to skip): ").strip()
+        if token:
+            values["CLAUDE_CODE_OAUTH_TOKEN"] = token
     set_env_values(values)
 
     print("Checking the connection …")

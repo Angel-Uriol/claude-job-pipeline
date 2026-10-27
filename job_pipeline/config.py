@@ -41,8 +41,11 @@ class Secrets(BaseSettings):
     otherwise shadow the real key in `.env`.
     """
 
+    # env_file is supplied at load time by `load_secrets()` (so tests and
+    # alternate setups can point it elsewhere); constructing Secrets(...)
+    # directly reads only the arguments + process env.
     model_config = SettingsConfigDict(
-        env_file=str(paths.ENV_FILE),
+        env_file=None,
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
@@ -57,6 +60,9 @@ class Secrets(BaseSettings):
     anthropic_api_key: str = Field(default="", alias="ANTHROPIC_API_KEY")
     # Optional path to the `claude` binary (claude_code mode only).
     claude_cli_path: str = Field(default="", alias="CLAUDE_CLI_PATH")
+    # Optional long-lived token from `claude setup-token` (claude_code mode
+    # only). Lets the CLI authenticate without an interactive /login.
+    claude_code_oauth_token: str = Field(default="", alias="CLAUDE_CODE_OAUTH_TOKEN")
     # RapidAPI key for the JSearch open-web scraper. Optional — empty
     # means the JSearch source is skipped (warn-and-continue).
     jsearch_api_key: str = Field(default="", alias="JSEARCH_API_KEY")
@@ -363,5 +369,5 @@ def load_config(path: str | Path | None = None) -> Config:
 
 
 def load_secrets() -> Secrets:
-    """Read `.env` into a Secrets object. Safe to call before .env exists."""
-    return Secrets()
+    """Read the repo's `.env` into a Secrets object. Safe before .env exists."""
+    return Secrets(_env_file=paths.ENV_FILE)

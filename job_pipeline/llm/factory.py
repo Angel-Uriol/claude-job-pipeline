@@ -18,7 +18,9 @@ def build_llm(secrets: Secrets | None = None) -> ClaudeClient:
     if s.auth_mode == "claude_code":
         from .cli_client import ClaudeCodeClient
 
-        return ClaudeCodeClient(cli_path=s.claude_cli_path)
+        return ClaudeCodeClient(
+            cli_path=s.claude_cli_path, oauth_token=s.claude_code_oauth_token
+        )
     from .api_client import AnthropicAPIClient
 
     return AnthropicAPIClient(api_key=s.anthropic_api_key)

@@ -2,8 +2,9 @@
 
 How it works: the Claude Agent SDK spawns the locally installed ``claude``
 CLI, which authenticates with whatever login that CLI already has (``claude``
-→ /login, or a long-lived token from ``claude setup-token`` exported as
-``CLAUDE_CODE_OAUTH_TOKEN``). This app never sees a password or token.
+→ /login), or with a long-lived token from ``claude setup-token`` that the
+user saved as ``CLAUDE_CODE_OAUTH_TOKEN`` in .env — we hand that token to the
+child process only. This app never sees a password.
 
 Terms note (also in the README and on the Setup page): Anthropic's Agent SDK
 terms say third-party products should use API keys rather than offering
@@ -75,19 +76,32 @@ def scrub_process_env() -> bool:
 
 
 def resolve_claude_cli(configured: str = "") -> str | None:
-    """Find the ``claude`` binary. Order: $CLAUDE_CODE_EXECPATH, the configured
-    path, ``claude`` on PATH, then the newest VS Code extension binary."""
-    env_path = os.environ.get("CLAUDE_CODE_EXECPATH", "").strip()
-    if env_path and Path(env_path).exists():
-        return env_path
+    """Find a standalone ``claude`` binary.
+
+    Order: the configured path (CLAUDE_CLI_PATH), ``claude`` on PATH, the
+    native installer's ~/.local/bin, the old ~/.claude/local install, the
+    newest VS Code extension binary — and only then $CLAUDE_CODE_EXECPATH.
+    That last one is set when this app is started from inside a Claude
+    desktop/IDE session and points at that app's private copy, which usually
+    can't log in on its own — so a real install always wins.
+    """
     if configured and Path(configured).expanduser().exists():
         return str(Path(configured).expanduser())
     on_path = shutil.which("claude")
     if on_path:
         return on_path
+    for p in (Path.home() / ".local" / "bin" / "claude",
+              Path.home() / ".claude" / "local" / "claude"):
+        if p.exists():
+            return str(p)
     ext_root = Path.home() / ".vscode" / "extensions"
     candidates = sorted(ext_root.glob("anthropic.claude-code-*/resources/native-binary/claude"))
-    return str(candidates[-1]) if candidates else None
+    if candidates:
+        return str(candidates[-1])
+    env_path = os.environ.get("CLAUDE_CODE_EXECPATH", "").strip()
+    if env_path and Path(env_path).exists():
+        return env_path
+    return None
 
 
 class ClaudeCodeClient:
@@ -95,7 +109,9 @@ class ClaudeCodeClient:
 
     auth_mode = "claude_code"
 
-    def __init__(self, *, cli_path: str = "", max_attempts: int = 2) -> None:
+    def __init__(
+        self, *, cli_path: str = "", oauth_token: str = "", max_attempts: int = 2
+    ) -> None:
         try:
             import claude_agent_sdk  # noqa: F401  (import check only)
         except ImportError as e:  # pragma: no cover - dependency is declared
@@ -105,8 +121,9 @@ class ClaudeCodeClient:
         if not self.cli_path:
             raise LLMError(
                 "Claude Code CLI not found. Install it (https://claude.com/claude-code), "
-                "run `claude` once to log in, or set CLAUDE_CODE_EXECPATH."
+                "run `claude` once to log in, or set CLAUDE_CLI_PATH in .env."
             )
+        self._oauth_token = oauth_token.strip()
         self._max_attempts = max_attempts
 
     # -- internals ---------------------------------------------------------
@@ -117,6 +134,8 @@ class ClaudeCodeClient:
         cli_dir = str(Path(self.cli_path).parent)
         if cli_dir not in env.get("PATH", "").split(os.pathsep):
             env["PATH"] = cli_dir + os.pathsep + env.get("PATH", "")
+        if self._oauth_token:
+            env["CLAUDE_CODE_OAUTH_TOKEN"] = self._oauth_token
         return env
 
     async def _run_async(self, prompt: str, model: str, system: str | None) -> str:
@@ -160,7 +179,8 @@ class ClaudeCodeClient:
             raise LLMError(f"Claude Code CLI not found: {e}") from e
         except ClaudeSDKError as e:
             raise LLMError(
-                f"Claude Code call failed: {e}. Is the CLI logged in? Run `claude` once."
+                f"Claude Code call failed: {e}. Log the CLI in (run `claude`, then /login), "
+                "or paste a token from `claude setup-token` on the Setup page."
             ) from e
         text = (result or "".join(parts)).strip()
         if is_error and not text:
@@ -218,11 +238,11 @@ class ClaudeCodeClient:
         return self._run(prompt, model, system)
 
 
-def describe_cli(cli_path: str = "") -> dict[str, Any]:
+def describe_cli(cli_path: str = "", oauth_token: str = "") -> dict[str, Any]:
     """Cheap status for the Setup page (no model call)."""
     path = resolve_claude_cli(cli_path)
     return {
         "cli_found": bool(path),
         "cli_path": path,
-        "oauth_token_env": bool(os.environ.get("CLAUDE_CODE_OAUTH_TOKEN")),
+        "oauth_token_env": bool(oauth_token or os.environ.get("CLAUDE_CODE_OAUTH_TOKEN")),
     }

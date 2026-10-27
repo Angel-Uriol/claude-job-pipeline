@@ -32,6 +32,7 @@ from ..onboarding.interview import (
     step,
 )
 from ..onboarding.resume_intake import parse_resume_file
+from ..onboarding.system import install, open_login_terminal, system_checks
 from ..onboarding.writer import build_files, write_files
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
@@ -40,6 +41,11 @@ MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 class AuthBody(BaseModel):
     mode: Literal["api_key", "claude_code"]
     api_key: str = ""
+    oauth_token: str = ""  # from `claude setup-token` (claude_code mode)
+
+
+class InstallBody(BaseModel):
+    component: Literal["renderer", "claude_cli"]
 
 
 class InterviewBody(BaseModel):
@@ -98,10 +104,26 @@ def register_setup_routes(app: FastAPI) -> None:
                 "mode": s.auth_mode,
                 "connected": llm_available(s),
                 "api_key_preview": mask(s.anthropic_api_key),
-                "cli": describe_cli(s.claude_cli_path),
+                "cli": describe_cli(s.claude_cli_path, s.claude_code_oauth_token),
             },
             "interview": _state_payload(InterviewState.load()),
         }
+
+    @app.get("/api/setup/system")
+    async def setup_system() -> dict[str, Any]:
+        s = load_secrets()
+        return {"checks": await asyncio.to_thread(system_checks, s.claude_cli_path)}
+
+    @app.post("/api/setup/install")
+    async def setup_install(body: InstallBody) -> dict[str, Any]:
+        result = await asyncio.to_thread(install, body.component)
+        s = load_secrets()
+        result["checks"] = await asyncio.to_thread(system_checks, s.claude_cli_path)
+        return result
+
+    @app.post("/api/setup/login-terminal")
+    async def setup_login_terminal() -> dict[str, Any]:
+        return await asyncio.to_thread(open_login_terminal, load_secrets().claude_cli_path)
 
     @app.post("/api/setup/auth")
     async def setup_auth(body: AuthBody) -> dict[str, Any]:
@@ -115,6 +137,13 @@ def register_setup_routes(app: FastAPI) -> None:
                 values["ANTHROPIC_API_KEY"] = key
             elif not load_secrets().anthropic_api_key:
                 raise HTTPException(400, "Paste an API key first.")
+        else:
+            token = body.oauth_token.strip()
+            if token:
+                if not token.startswith("sk-ant-oat"):
+                    raise HTTPException(400, "That doesn't look like a `claude setup-token` "
+                                             "token (they start with sk-ant-oat).")
+                values["CLAUDE_CODE_OAUTH_TOKEN"] = token
         set_env_values(values)
         return await asyncio.to_thread(self_check, _models().fast_model)
 

@@ -21,10 +21,13 @@ import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..models import Job, Source
 from ..store import JobStore
+
+if TYPE_CHECKING:
+    from ..applied_guard import TrackedIndex
 
 log = logging.getLogger(__name__)
 
@@ -43,15 +46,22 @@ class ImportStats:
     updated: int = 0
     excluded: int = 0
     skipped_malformed: int = 0
+    already_tracked: int = 0
     errors: list[str] = field(default_factory=list)
 
     @property
     def total_seen(self) -> int:
-        return self.inserted + self.updated + self.excluded + self.skipped_malformed
+        return (self.inserted + self.updated + self.excluded + self.skipped_malformed
+                + self.already_tracked)
 
 
-def import_chrome_claude_jsonl(path: Path, store: JobStore) -> ImportStats:
+def import_chrome_claude_jsonl(
+    path: Path, store: JobStore, *, tracked: TrackedIndex | None = None
+) -> ImportStats:
     """Read `path`, upsert each row into `store`, return stats.
+
+    With `tracked` (the applied guard), rows matching a job already in your
+    tracker are skipped and counted in `stats.already_tracked`.
 
     The caller is responsible for calling `store.save()` after — same
     pattern as the scraper command. Atomic save → either all the
@@ -91,6 +101,10 @@ def import_chrome_claude_jsonl(path: Path, store: JobStore) -> ImportStats:
             except Exception as e:
                 stats.skipped_malformed += 1
                 stats.errors.append(f"line {lineno}: failed to build Job: {e}")
+                continue
+
+            if tracked is not None and tracked.match(job) is not None:
+                stats.already_tracked += 1
                 continue
 
             outcome = store.upsert(job)

@@ -7,11 +7,12 @@
 PY := uv run python
 CLI := $(PY) -m job_pipeline.cli
 
-.PHONY: help install dev auth setup doctor scrape jsearch pre-filter deep-fit \
+.PHONY: help start install dev auth setup doctor scrape jsearch pre-filter deep-fit \
         digest tracker handoff daily backend frontend test lint type check clean
 
 help:
 	@echo "First run:"
+	@echo "  start       install anything missing, then open the web UI (one command)"
 	@echo "  install     Python + Node dependencies"
 	@echo "  dev         start the web UI (backend :8765 + frontend :8766)"
 	@echo "  auth        connect Claude from the terminal (API key or Claude Code login)"
@@ -24,6 +25,12 @@ help:
 	@echo ""
 	@echo "Dev:"
 	@echo "  check       lint + type + test"
+
+# One command for first-timers: install only what's missing, then run.
+start:
+	@[ -d .venv ] || uv sync --all-extras
+	@[ -d ui/node_modules ] || (cd ui && npm ci)
+	@$(MAKE) --no-print-directory dev
 
 install:
 	uv sync --all-extras

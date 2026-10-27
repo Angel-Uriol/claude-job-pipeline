@@ -363,6 +363,15 @@ export interface SetupStatus {
   interview: SetupInterview;
 }
 
+export interface SystemCheck {
+  id: "node" | "renderer" | "claude_cli";
+  label: string;
+  ok: boolean;
+  detail: string;
+  installable: boolean;
+  optional: boolean;
+}
+
 export interface AuthCheck {
   auth_mode: AuthMode;
   model: string;
