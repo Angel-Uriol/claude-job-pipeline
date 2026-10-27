@@ -1,0 +1,18 @@
+# Candidate profile
+
+{{ candidate }}
+
+# Hard skips (exclude these from results)
+
+- Titles containing: {{ p.excluded_titles | join(", ") if p.excluded_titles else "(none)" }}
+- Roles requiring {{ max_years }}+ years of experience
+- Roles requiring US citizenship or an active security clearance
+{%- if p.needs_sponsorship %}
+- Roles explicitly stating "no visa sponsorship"
+{%- endif %}
+{%- if p.location_preference %}
+- Locations that break this rule: {{ p.location_preference }}
+{%- endif %}
+{%- for d in p.deal_breakers %}
+- {{ d }}
+{%- endfor %}

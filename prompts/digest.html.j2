@@ -1,0 +1,310 @@
+{# Jinja2 template for the daily HTML digest. Editable — tweak the
+   layout or copy here. Jinja2 reference: {% if %} / {% for %}, {{ var }}.
+
+   The Python builder in job_pipeline/digest/html_builder.py passes:
+     date_str         — "2026-05-14"
+     apply_groups     — list[(company_name, [Job, ...])]
+     consider_groups  — same shape
+     no_api_prompts   — list[{name, careers_url, prompt}]
+     skipped          — list[Job], collapsed by default
+     applied          — list[Job], sanity check
+     dead_companies   — set[str], lowercased, for the "DEAD" badge
+     counts           — dict with apply/consider/skipped/applied/total
+#}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Job Digest — {{ date_str }}</title>
+  <style>
+    /* Single-file, no external CSS/JS — prints cleanly. */
+    :root {
+      --bg: #fafafa;
+      --fg: #1a1a1a;
+      --muted: #666;
+      --accent: #0a66c2;
+      --good: #1f7a3a;
+      --warn: #b25b00;
+      --bad: #b00020;
+      --card: #fff;
+      --border: #e2e2e2;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      max-width: 920px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      color: var(--fg);
+      background: var(--bg);
+      line-height: 1.5;
+    }
+    header h1 { margin: 0 0 0.25rem 0; }
+    header .summary { color: var(--muted); font-size: 0.95rem; }
+    section { margin: 2.5rem 0; }
+    section h2 {
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 0.25rem;
+      margin-bottom: 1rem;
+    }
+    h3.company {
+      margin: 1.5rem 0 0.5rem 0;
+      font-size: 1.1rem;
+      color: var(--accent);
+    }
+    .company .dead-badge {
+      font-size: 0.7rem;
+      background: var(--bad);
+      color: #fff;
+      padding: 0.1rem 0.4rem;
+      border-radius: 3px;
+      vertical-align: middle;
+      margin-left: 0.5rem;
+    }
+    .job {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.9rem 1rem;
+      margin: 0.6rem 0;
+    }
+    .job h4 {
+      margin: 0 0 0.3rem 0;
+      font-size: 1rem;
+    }
+    .job .score {
+      float: right;
+      font-weight: bold;
+      padding: 0.1rem 0.5rem;
+      border-radius: 3px;
+    }
+    .score.apply { background: #d4f4dd; color: var(--good); }
+    .score.consider { background: #ffe9c2; color: var(--warn); }
+    .job .meta { color: var(--muted); font-size: 0.9rem; margin: 0.15rem 0; }
+    .job .justification { margin: 0.5rem 0 0.3rem 0; }
+    .job .bridge {
+      background: #fff8e0;
+      border-left: 3px solid var(--warn);
+      padding: 0.4rem 0.7rem;
+      margin: 0.4rem 0;
+      font-size: 0.92rem;
+    }
+    .job .actions { margin-top: 0.5rem; font-size: 0.9rem; }
+    .job .actions a {
+      color: var(--accent);
+      text-decoration: none;
+      margin-right: 0.8rem;
+    }
+    .job .actions a:hover { text-decoration: underline; }
+    .job .actions code {
+      background: #f0f0f0;
+      padding: 0.1rem 0.4rem;
+      border-radius: 3px;
+      font-size: 0.85rem;
+    }
+    .prompt-block {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.9rem 1rem;
+      background: var(--card);
+      margin: 0.8rem 0;
+    }
+    .prompt-block header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+    }
+    .prompt-block h3 { margin: 0; font-size: 1.05rem; }
+    .prompt-block button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 0.3rem 0.8rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .prompt-block pre {
+      background: #f6f6f6;
+      padding: 0.8rem;
+      border-radius: 4px;
+      white-space: pre-wrap;
+      font-size: 0.85rem;
+      max-height: 22em;
+      overflow-y: auto;
+    }
+    table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+    table th, table td {
+      text-align: left;
+      padding: 0.4rem 0.6rem;
+      border-bottom: 1px solid var(--border);
+    }
+    details summary { cursor: pointer; font-weight: bold; }
+    .empty { color: var(--muted); font-style: italic; }
+    @media print {
+      body { max-width: 100%; }
+      .prompt-block button { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Job Digest — {{ date_str }}</h1>
+  <div class="summary">
+    {{ counts.apply }} apply · {{ counts.consider }} consider ·
+    {{ counts.skipped }} skipped · {{ counts.applied }} already applied ·
+    {{ counts.total }} total
+  </div>
+</header>
+
+{# --- 1. Top picks ----------------------------------------------------- #}
+<section id="apply">
+  <h2>Top picks ({{ counts.apply }})</h2>
+  {% if not apply_groups %}
+    <p class="empty">Nothing scoring at or above the apply threshold today.</p>
+  {% endif %}
+  {% for company, jobs in apply_groups %}
+    <h3 class="company">
+      {{ company }}
+      {% if company in dead_companies %}<span class="dead-badge">DEAD</span>{% endif %}
+    </h3>
+    {% for job in jobs %}
+      <div class="job">
+        <span class="score apply">{{ '%.1f'|format(job.fit_score) }}</span>
+        <h4>{{ job.title }}</h4>
+        <p class="meta">
+          {{ job.location or '(location unknown)' }}
+          {% if job.team %}· {{ job.team }}{% endif %}
+        </p>
+        <p class="justification">{{ job.fit_justification or '' }}</p>
+        {% if job.honest_bridge_notes %}
+          <p class="bridge"><strong>Bridge:</strong> {{ job.honest_bridge_notes }}</p>
+        {% endif %}
+        <p class="actions">
+          <a href="{{ job.url }}" target="_blank">Apply ↗</a>
+          <code>python -m job_pipeline.cli resume --job-id {{ job.job_id or job.dedup_key()[1] }}</code>
+        </p>
+      </div>
+    {% endfor %}
+  {% endfor %}
+</section>
+
+{# --- 2. Worth considering -------------------------------------------- #}
+<section id="consider">
+  <h2>Worth considering ({{ counts.consider }})</h2>
+  {% if not consider_groups %}
+    <p class="empty">No mid-range fits this run.</p>
+  {% endif %}
+  {% for company, jobs in consider_groups %}
+    <h3 class="company">
+      {{ company }}
+      {% if company in dead_companies %}<span class="dead-badge">DEAD</span>{% endif %}
+    </h3>
+    {% for job in jobs %}
+      <div class="job">
+        <span class="score consider">{{ '%.1f'|format(job.fit_score) }}</span>
+        <h4>{{ job.title }}</h4>
+        <p class="meta">
+          {{ job.location or '(location unknown)' }}
+          {% if job.team %}· {{ job.team }}{% endif %}
+        </p>
+        <p class="justification">{{ job.fit_justification or '' }}</p>
+        {% if job.honest_bridge_notes %}
+          <p class="bridge"><strong>Bridge:</strong> {{ job.honest_bridge_notes }}</p>
+        {% endif %}
+        <p class="actions">
+          <a href="{{ job.url }}" target="_blank">Apply ↗</a>
+          <code>python -m job_pipeline.cli resume --job-id {{ job.job_id or job.dedup_key()[1] }}</code>
+        </p>
+      </div>
+    {% endfor %}
+  {% endfor %}
+</section>
+
+{# --- 3. Chrome Claude prompts for no-API companies ------------------- #}
+<section id="chrome-prompts">
+  <h2>Companies without API — Chrome Claude prompts ({{ no_api_prompts|length }})</h2>
+  <p class="empty">
+    Paste each prompt into Chrome Claude or Claude.ai. The output is JSONL
+    that you can feed back via
+    <code>python -m job_pipeline.cli import --file output.jsonl</code>.
+  </p>
+  {% for entry in no_api_prompts %}
+    <div class="prompt-block">
+      <header>
+        <h3>
+          {{ entry.name }}
+          <a href="{{ entry.careers_url }}" target="_blank" style="font-size: 0.85rem;">careers ↗</a>
+        </h3>
+        <button onclick="copyPrompt('prompt-{{ loop.index }}')">Copy</button>
+      </header>
+      <pre id="prompt-{{ loop.index }}">{{ entry.prompt }}</pre>
+    </div>
+  {% endfor %}
+</section>
+
+{# --- 4. Skipped (collapsed) ----------------------------------------- #}
+<section id="skipped">
+  <details>
+    <summary>Skipped ({{ counts.skipped }})</summary>
+    {% if skipped %}
+      <table>
+        <thead>
+          <tr><th>Company</th><th>Title</th><th>Reason</th></tr>
+        </thead>
+        <tbody>
+          {% for job in skipped %}
+            <tr>
+              <td>{{ job.company }}</td>
+              <td><a href="{{ job.url }}" target="_blank">{{ job.title }}</a></td>
+              <td>{{ job.pre_filter_reason or job.fit_justification or '—' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="empty">No skipped jobs.</p>
+    {% endif %}
+  </details>
+</section>
+
+{# --- 5. Already applied (sanity check) ----------------------------- #}
+<section id="applied">
+  <h2>Already applied ({{ counts.applied }})</h2>
+  <p class="empty">Cross-check before you apply to anything above.</p>
+  {% if applied %}
+    <table>
+      <thead>
+        <tr><th>Company</th><th>Title</th><th>Applied</th></tr>
+      </thead>
+      <tbody>
+        {% for job in applied %}
+          <tr>
+            <td>{{ job.company }}</td>
+            <td><a href="{{ job.url }}" target="_blank">{{ job.title }}</a></td>
+            <td>{{ job.applied_at or '—' }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty">No applications recorded yet.</p>
+  {% endif %}
+</section>
+
+<script>
+  function copyPrompt(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    navigator.clipboard.writeText(el.innerText).then(() => {
+      const btn = event.target;
+      const old = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = old, 1500);
+    });
+  }
+</script>
+
+</body>
+</html>

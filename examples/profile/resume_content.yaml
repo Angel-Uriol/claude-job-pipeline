@@ -1,0 +1,115 @@
+# Resume content — EXAMPLE (fictional candidate "Jordan Rivera").
+#
+# The setup questionnaire writes your own version of this file to
+# profile/resume_content.yaml from the resume you upload. Edit it freely
+# afterwards — every generated resume is built from it.
+#
+# Schema: job_pipeline/resume/content_loader.py (ResumeContent).
+# Bullet IDs are unique (b*, p*) and stable so the Claude tailorer can merge
+# reworded bullets back by id. Never inflate metrics — honest reframing only.
+
+header:
+  name: "Jordan Rivera"
+  email: "jordan.rivera@example.com"
+  phone: "(555) 010-2020"
+  linkedin: "https://www.linkedin.com/in/jordan-rivera-example/"
+  location: "San Francisco Bay Area, CA"
+
+# Single generic summary. The family name is `software_engineer`.
+summaries:
+  software_engineer: >-
+    Software engineer with 4 years building and operating backend
+    services and full-stack web applications. Comfortable across the
+    stack — API design, relational data modeling, and cloud deployment —
+    with a track record of shipping reliable features and improving
+    system performance.
+
+experiences:
+  platform_co:
+    company: "Retail Platform Co."
+    title: "Software Engineer"
+    location: "San Francisco, CA"
+    start: "2022"
+    end: "Present"
+    bullets:
+      - id: b1
+        text: >-
+          Designed and shipped REST and GraphQL APIs in Go and Python
+          serving 2M+ daily requests, cutting p95 latency ~30% through
+          query optimization and caching.
+        tags: [go, python, api, rest, graphql, backend, performance]
+      - id: b2
+        text: >-
+          Modeled and migrated core PostgreSQL schemas with zero-downtime
+          rollouts, adding partitioning and indexes that reduced report
+          query times from minutes to seconds.
+        tags: [postgres, sql, schema, migrations, backend]
+      - id: b3
+        text: >-
+          Containerized services with Docker and deployed on Kubernetes,
+          building CI/CD pipelines that took releases from weekly to
+          multiple times per day.
+        tags: [docker, kubernetes, ci-cd, devops, cloud]
+      - id: b4
+        text: >-
+          Built React/TypeScript front-end features backed by the APIs
+          above, collaborating with design and product to ship an
+          account-management redesign.
+        tags: [react, typescript, frontend, javascript]
+
+  fintech_startup:
+    company: "Fintech Startup (Contract)"
+    title: "Software Engineer"
+    location: "Remote"
+    start: "2020"
+    end: "2022"
+    bullets:
+      - id: b5
+        text: >-
+          Implemented payment-processing services in Python with strong
+          test coverage and idempotency guarantees, handling millions of
+          dollars in monthly volume.
+        tags: [python, backend, api, testing, payments]
+      - id: b6
+        text: >-
+          Instrumented services with structured logging and dashboards,
+          reducing mean-time-to-detection for incidents by roughly half.
+        tags: [observability, monitoring, backend]
+
+projects:
+  url_shortener:
+    title: "Open-source URL Shortener"
+    stack: "Personal Project · 2023"
+    bullets:
+      - id: p1
+        text: >-
+          Built a URL-shortening service in Go with a Redis cache and
+          Postgres store; open-sourced with documentation and a Docker
+          Compose setup.
+        tags: [go, redis, postgres, docker, backend]
+      - id: p2
+        text: >-
+          Added a small React dashboard for link analytics with
+          click-through charts.
+        tags: [react, frontend, typescript]
+
+education:
+  - school: "State University"
+    degree: "B.S., Computer Science"
+    location: "Berkeley, CA"
+    start: ""
+    end: "2020"
+    honors: "Relevant Coursework: Algorithms · Databases · Operating Systems · Distributed Systems"
+
+skills:
+  languages: ["Go", "Python", "TypeScript", "SQL"]
+  data_platform: ["PostgreSQL", "Redis", "Kafka"]
+  cloud: ["AWS (EC2, S3, RDS)", "Docker", "Kubernetes", "Terraform", "Git"]
+  ml: []
+  frontend: ["React", "Node.js", "REST", "GraphQL"]
+  other: ["CI/CD", "System Design", "Unit & Integration Testing"]
+
+additional:
+  languages: "Fluent English"
+  certifications: ""
+  academic_background: ""

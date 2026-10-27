@@ -1,0 +1,69 @@
+[project]
+name = "claude-job-pipeline"
+version = "1.0.0"
+description = "Local, Claude-powered job search: questionnaire → scrape → score → tailored resumes → tracker."
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.11"
+
+dependencies = [
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "pyyaml>=6.0",
+    "httpx>=0.27",
+    "anthropic>=0.40",   # Claude via API key (forced tool use for structured output)
+    "claude-agent-sdk>=0.1.0",  # optional auth mode: your local Claude Code login
+    "jinja2>=3.1",       # digest HTML template
+    "openpyxl>=3.1",     # Excel tracker
+    "python-docx>=1.1",  # docx validator (read-only check after Node renders)
+    "fastapi>=0.115",    # local web UI server
+    "uvicorn[standard]>=0.30",
+    "sse-starlette>=2.1",
+    "python-multipart>=0.0.9",  # multipart form parsing for the setup resume upload
+    "pypdf>=4.0",        # extract text from an uploaded PDF resume during setup
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-mock>=3.12",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "types-PyYAML",
+    "types-openpyxl",  # openpyxl stubs so mypy --strict has types for the Excel tracker
+]
+
+[project.scripts]
+job-pipeline = "job_pipeline.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["job_pipeline"]
+
+# --- linters / type checker ------------------------------------------------
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # import sorting
+    "B",   # flake8-bugbear (common pitfalls)
+    "UP",  # pyupgrade (modern syntax)
+]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["job_pipeline"]
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

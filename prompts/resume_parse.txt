@@ -1,0 +1,50 @@
+You are an expert resume parser. Extract the structured content of the
+resume below into the required schema. Return ONLY the structured data —
+no commentary.
+
+CRITICAL HONESTY RULES (these are non-negotiable):
+- Extract only what is actually in the resume. NEVER invent employers,
+  titles, dates, skills, or accomplishments that aren't present.
+- Preserve every metric, number, percentage, and scale EXACTLY as written.
+  Do not round, inflate, or "improve" any figure.
+- If a field is genuinely absent from the resume, leave it empty ("") or
+  as an empty list — do not guess.
+
+FIELD GUIDANCE:
+- name / email / phone / linkedin / location: from the resume header. Use
+  "" for anything missing. For linkedin, include the full URL if present.
+- summary: write ONE concise 3–5 line professional summary in the third
+  person describing this candidate as a software engineer. Base it strictly
+  on the resume — years of experience, core technologies, and the kind of
+  work they've done. No visa/sponsorship language. No fluff.
+- experiences: one entry per job, most recent first. For each, capture the
+  company, title, location, start, and end (use the resume's own date
+  strings, e.g. "Jan 2022", "2020", "Present"). Under bullets, copy each
+  accomplishment/responsibility bullet as its own item, lightly cleaned for
+  grammar but with all facts and numbers intact.
+- projects: personal, academic, or open-source projects, if the resume
+  lists any. Same bullet rules. Leave empty if none.
+- education: one entry per degree/school with school, degree, location,
+  start, end, and any honors/coursework line.
+- skills: bucket the candidate's skills into these groups. Put each skill
+  in the single best-fitting bucket; leave a bucket empty if nothing fits.
+    - languages:     programming languages (Python, Go, Java, SQL, …)
+    - data_platform: databases, data stores, pipelines (PostgreSQL, Redis,
+                     Kafka, Spark, Airflow, …)
+    - cloud:         cloud, infra, devops, tooling (AWS, GCP, Docker,
+                     Kubernetes, Terraform, Git, CI/CD, …)
+    - ml:            ML / data-science tools (PyTorch, scikit-learn,
+                     TensorFlow, MLflow, …) — leave empty if not an ML resume
+    - frontend:      web/UI and API tech (React, Node.js, REST, GraphQL,
+                     TypeScript UI work, …)
+    - other:         anything real that doesn't fit above
+- languages_spoken: spoken/human languages, if listed (e.g. "English,
+  Spanish"). Otherwise "".
+- certifications: certifications, if listed. Otherwise "".
+- academic_background: any extra academic note (prior program, awards) that
+  doesn't belong in the education entries. Otherwise "".
+
+RESUME TEXT:
+-----
+{resume_text}
+-----

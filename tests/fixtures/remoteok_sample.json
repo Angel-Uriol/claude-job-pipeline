@@ -1,0 +1,60 @@
+[
+  {
+    "last_updated": "2026-05-19T12:00:00+00:00",
+    "legal": "All data is provided as-is; see remoteok.com for full terms."
+  },
+  {
+    "slug": "remote-senior-data-engineer-foo-1234567",
+    "id": "1234567",
+    "epoch": 1778947203,
+    "date": "2026-05-16T16:00:03+00:00",
+    "company": "Foo Co",
+    "position": "Senior Data Engineer",
+    "tags": ["python", "aws", "engineer", "engineering", "pyspark"],
+    "description": "<p>Build pipelines. PySpark + Airflow.</p>",
+    "location": "USA",
+    "apply_url": "https://example.com/apply/1234567",
+    "salary_min": 150000,
+    "salary_max": 200000,
+    "url": "https://remoteok.com/remote-jobs/1234567"
+  },
+  {
+    "slug": "remote-customer-support-2222222",
+    "id": "2222222",
+    "epoch": 1778947100,
+    "date": "2026-05-15T10:00:00+00:00",
+    "company": "Bar Inc",
+    "position": "Customer Support Specialist",
+    "tags": ["support", "service", "zendesk"],
+    "description": "<p>Help customers.</p>",
+    "location": "Worldwide",
+    "apply_url": "https://example.com/apply/2222222",
+    "url": "https://remoteok.com/remote-jobs/2222222"
+  },
+  {
+    "slug": "remote-ml-engineer-baz-3333333",
+    "id": "3333333",
+    "epoch": 1778900000,
+    "date": "2026-05-14T08:00:00+00:00",
+    "company": "Baz Labs",
+    "position": "Machine Learning Engineer",
+    "tags": ["ml", "pytorch", "python", "ai"],
+    "description": "<p>Production ML.</p>",
+    "location": "",
+    "apply_url": "https://example.com/apply/3333333",
+    "url": "https://remoteok.com/remote-jobs/3333333"
+  },
+  {
+    "slug": "remote-marketing-manager-4444444",
+    "id": "4444444",
+    "epoch": 1778900000,
+    "date": "2026-05-13T07:00:00+00:00",
+    "company": "Qux Corp",
+    "position": "Marketing Manager",
+    "tags": ["marketing", "growth", "seo"],
+    "description": "<p>Growth marketing.</p>",
+    "location": "USA",
+    "apply_url": "https://example.com/apply/4444444",
+    "url": "https://remoteok.com/remote-jobs/4444444"
+  }
+]

@@ -1,0 +1,59 @@
+[
+  {
+    "id": "abc-def-123",
+    "text": "Senior Software Engineer, Data Platform",
+    "hostedUrl": "https://jobs.lever.co/example/abc-def-123",
+    "applyUrl": "https://jobs.lever.co/example/abc-def-123/apply",
+    "createdAt": 1712000000000,
+    "categories": {
+      "location": "San Francisco, CA",
+      "team": "Data Platform",
+      "department": "Engineering",
+      "commitment": "Full-time"
+    },
+    "description": "<p>Build the data platform powering analytics.</p>",
+    "descriptionPlain": "Build the data platform powering analytics.",
+    "lists": [
+      {"text": "Responsibilities", "content": "<ul><li>Design and operate data pipelines</li><li>Work with PySpark and Airflow</li></ul>"},
+      {"text": "Requirements", "content": "<ul><li>3+ years experience</li><li>Python and SQL fluency</li></ul>"}
+    ],
+    "additional": "",
+    "additionalPlain": ""
+  },
+  {
+    "id": "xyz-789",
+    "text": "Principal Engineer, Infrastructure",
+    "hostedUrl": "https://jobs.lever.co/example/xyz-789",
+    "createdAt": 1711000000000,
+    "categories": {
+      "location": "New York, NY",
+      "team": "Infrastructure"
+    },
+    "description": "<p>Principal-level infra role.</p>",
+    "lists": []
+  },
+  {
+    "id": "remote-456",
+    "text": "Data Engineer",
+    "hostedUrl": "https://jobs.lever.co/example/remote-456",
+    "createdAt": 1713000000000,
+    "categories": {
+      "location": "Remote",
+      "team": "Analytics"
+    },
+    "description": "<p>Build the analytics stack.</p>",
+    "lists": []
+  },
+  {
+    "id": "intl-001",
+    "text": "Software Engineer",
+    "hostedUrl": "https://jobs.lever.co/example/intl-001",
+    "createdAt": 1712500000000,
+    "categories": {
+      "location": "Bangalore, India",
+      "team": "Platform"
+    },
+    "description": "<p>India-based role.</p>",
+    "lists": []
+  }
+]

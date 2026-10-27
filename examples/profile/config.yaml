@@ -1,0 +1,147 @@
+# Pipeline config — EXAMPLE for a fictional candidate ("Jordan Rivera").
+#
+# The setup questionnaire (web UI → Setup, or `job-pipeline setup`) writes
+# your own copy to profile/config.yaml. Everything about WHO you are and
+# WHAT you want lives under `profile:`; the rest is pipeline mechanics.
+# Edit freely — the file is validated at startup, so a typo fails loudly.
+#
+# Secrets (API keys) and the Claude auth mode live in .env, NOT here.
+
+# --------------------------------------------------------------------------
+# Candidate profile — injected into every scoring and search prompt.
+# --------------------------------------------------------------------------
+profile:
+  name: "Jordan Rivera"
+  email: "jordan.rivera@example.com"
+  phone: "(555) 010-2020"
+  linkedin: "https://www.linkedin.com/in/jordan-rivera-example/"
+  location: "San Francisco Bay Area, CA"
+  headline: "Backend / data engineer, ~4 years building Python + Go services"
+  years_experience: 4
+  work_authorization: "US citizen"
+  needs_sponsorship: false
+  target_levels: ["mid", "senior"]
+  target_functions:
+    - { name: "Backend Engineering", tier: "A", notes: "APIs, distributed systems" }
+    - { name: "Data Engineering / Data Platform", tier: "A" }
+    - { name: "Platform / Infrastructure Engineering", tier: "B" }
+    - { name: "Full-stack Engineering", tier: "B", notes: "backend-leaning" }
+    - { name: "ML Engineering", tier: "C", notes: "career-pivot stretch" }
+  must_have_skills: ["python"]
+  preferred_skills: ["go", "postgresql", "kafka", "aws", "docker", "kubernetes", "sql", "react"]
+  excluded_titles: ["director", "principal", "staff", "vp", "head of", "manager"]
+  max_years_required: 0          # 0 = automatic (years_experience + 5)
+  location_preference: "San Francisco Bay Area, or fully remote within the US"
+  salary_floor: "$150k base"
+  highlights:
+    - "Cut p99 latency of a payments API by 40% by moving hot paths from Python to Go"
+    - "Built a Kafka → Postgres ingestion pipeline handling ~2M events/day"
+    - "Led migration of 30 services onto Kubernetes with zero customer-facing downtime"
+  honest_gaps:
+    - "No production machine-learning model training"
+    - "Limited frontend work beyond internal React tools"
+  deal_breakers:
+    - "Mostly on-call / pager-heavy SRE roles"
+  dream_companies: ["stripe", "databricks", "cloudflare"]
+
+# --------------------------------------------------------------------------
+# Where to scrape from. The questionnaire fills these from your target
+# companies after checking which job board (ATS) each one uses.
+# --------------------------------------------------------------------------
+scrapers:
+  # https://boards-api.greenhouse.io/v1/boards/<slug>/jobs?content=true
+  greenhouse:
+    - { name: "stripe",     slug: "stripe" }
+    - { name: "databricks", slug: "databricks" }
+    - { name: "cloudflare", slug: "cloudflare" }
+    - { name: "datadog",    slug: "datadog" }
+  # https://api.lever.co/v0/postings/<slug>?mode=json
+  lever:
+    - { name: "palantir", slug: "palantir" }
+  # https://api.ashbyhq.com/posting-api/job-board/<slug>
+  ashby:
+    - { name: "linear",  slug: "linear" }
+    - { name: "notion",  slug: "notion" }
+  # RemoteOK aggregator (remote-only). One entry; the API call is fixed.
+  remoteok:
+    - { name: "remoteok" }
+  # JSearch (RapidAPI) open-web search — on demand only, needs JSEARCH_API_KEY.
+  # date_posted: all | today | 3days | week | month
+  jsearch:
+    - { query: "Backend Engineer Python in San Francisco", date_posted: "week", num_pages: 1 }
+    - { query: "Data Platform Engineer remote", date_posted: "week", num_pages: 1, remote_only: true }
+  # Companies with no public job-board API. The digest generates a ready
+  # Chrome Claude prompt for each so a browser agent can search them.
+  no_api:
+    - { name: "uber", careers_url: "https://www.uber.com/us/en/careers/list/", platform: "custom" }
+
+# Never store jobs from these companies (case-insensitive).
+excluded_companies: []
+
+# Companies that recently rejected you — shown with a DEAD badge.
+dead_companies: []
+
+# --------------------------------------------------------------------------
+# Claude models. Fast = cheap, high-volume calls; smart = judgment calls.
+# --------------------------------------------------------------------------
+scoring:
+  pre_filter_model: "claude-haiku-5-5"
+  deep_fit_model: "claude-sonnet-5-5"
+  thresholds:
+    apply: 8.0      # fit_score >= apply    → verdict "apply"
+    consider: 5.0   # fit_score >= consider → "consider"; below → "skip"
+
+llm:
+  fast_model: "claude-haiku-5-5"
+  smart_model: "claude-sonnet-5-5"
+
+# Resume tailoring: Claude honestly rewords the summary + bullets per job.
+resume:
+  tailor_enabled: true
+  model: "claude-sonnet-5-5"
+
+# The Track tab's database.
+tracker:
+  enabled: true
+  db_path: "data/tracker.db"
+  verdicts: ["apply", "consider"]
+  max_per_company: 4
+
+# --------------------------------------------------------------------------
+# Scrape-time filters (run BEFORE any LLM call, so they save money).
+# A job passes location if it contains a location token, or — when
+# allow_remote — a remote token without a hybrid disqualifier.
+# --------------------------------------------------------------------------
+filters:
+  location_filter_enabled: true
+  allow_remote: true
+  max_age_days: 20
+  location_tokens:
+    - "california"
+    - ", ca"
+    - "bay area"
+    - "san francisco"
+    - "oakland"
+    - "san jose"
+    - "palo alto"
+    - "mountain view"
+    - "sunnyvale"
+  remote_tokens: ["remote", "anywhere", "distributed"]
+  hybrid_disqualifiers: ["hybrid"]
+
+rate_limits:
+  api_calls_per_minute: 30        # applied to Claude calls
+  scraper_delay_seconds: 0.5      # sleep between job-board requests
+
+# "Run Chrome Claude" browser-search caps.
+chrome_claude:
+  batch_size: 3
+  max_parallel_batches: 3
+  max_roles_per_company: 10
+  exclude_companies: []
+
+paths:
+  jobs_json:    "data/jobs.json"
+  tracker_xlsx: "data/tracker.xlsx"
+  digests_dir:  "data/digests"
+  resumes_dir:  "outputs/resumes"

@@ -1,0 +1,75 @@
+{
+  "apiVersion": "v1",
+  "jobs": [
+    {
+      "id": "d3bc1ced-3ce4-4086-a050-555055dbb1ff",
+      "title": "Senior Data Engineer",
+      "department": "Product",
+      "team": "Data Platform",
+      "employmentType": "FullTime",
+      "location": "San Francisco",
+      "secondaryLocations": [
+        {"location": "Remote — US"}
+      ],
+      "publishedAt": "2026-04-27T20:13:45.158+00:00",
+      "isListed": true,
+      "isRemote": false,
+      "workplaceType": "Hybrid",
+      "jobUrl": "https://jobs.ashbyhq.com/linear/d3bc1ced-3ce4-4086-a050-555055dbb1ff",
+      "applyUrl": "https://jobs.ashbyhq.com/linear/d3bc1ced-3ce4-4086-a050-555055dbb1ff/application",
+      "descriptionHtml": "<p>Build data <strong>platform</strong></p>",
+      "descriptionPlain": "Build the data platform that powers our ML systems. PySpark, Airflow, Iceberg."
+    },
+    {
+      "id": "a1b2c3d4-1111-2222-3333-444455556666",
+      "title": "Remote-Only ML Platform Engineer",
+      "department": "Engineering",
+      "team": null,
+      "employmentType": "FullTime",
+      "location": "",
+      "secondaryLocations": [],
+      "publishedAt": "2026-05-01T10:00:00.000+00:00",
+      "isListed": true,
+      "isRemote": true,
+      "workplaceType": "Remote",
+      "jobUrl": "https://jobs.ashbyhq.com/linear/a1b2c3d4",
+      "applyUrl": "https://jobs.ashbyhq.com/linear/a1b2c3d4/application",
+      "descriptionHtml": "",
+      "descriptionPlain": "Work on ML infra. PyTorch + Kubernetes."
+    },
+    {
+      "id": "unlisted-skip-me",
+      "title": "Hidden Role",
+      "department": "Engineering",
+      "team": "Stealth",
+      "employmentType": "FullTime",
+      "location": "NYC",
+      "secondaryLocations": [],
+      "publishedAt": "2026-04-01T00:00:00.000+00:00",
+      "isListed": false,
+      "isRemote": false,
+      "workplaceType": "Onsite",
+      "jobUrl": "https://jobs.ashbyhq.com/linear/unlisted-skip-me",
+      "applyUrl": "https://jobs.ashbyhq.com/linear/unlisted-skip-me/application",
+      "descriptionHtml": "<p>Should be filtered out.</p>",
+      "descriptionPlain": "Should be filtered out."
+    },
+    {
+      "id": "html-fallback-id",
+      "title": "Backend Engineer",
+      "department": "Engineering",
+      "team": "API",
+      "employmentType": "FullTime",
+      "location": "Los Angeles, CA",
+      "secondaryLocations": [],
+      "publishedAt": "2026-05-10T12:00:00.000+00:00",
+      "isListed": true,
+      "isRemote": false,
+      "workplaceType": "Onsite",
+      "jobUrl": "https://jobs.ashbyhq.com/linear/html-fallback-id",
+      "applyUrl": "https://jobs.ashbyhq.com/linear/html-fallback-id/application",
+      "descriptionHtml": "<p>Build <em>great</em> APIs.</p>",
+      "descriptionPlain": ""
+    }
+  ]
+}

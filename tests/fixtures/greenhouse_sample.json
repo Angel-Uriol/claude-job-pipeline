@@ -1,0 +1,54 @@
+{
+  "jobs": [
+    {
+      "id": 4567890,
+      "internal_job_id": 1234567,
+      "title": "Software Engineer, ML Platform",
+      "updated_at": "2026-04-15T18:32:00Z",
+      "first_published": "2026-04-10T12:00:00Z",
+      "absolute_url": "https://job-boards.greenhouse.io/anthropic/jobs/4567890",
+      "location": {"name": "San Francisco, CA"},
+      "departments": [{"id": 100, "name": "Engineering"}],
+      "offices": [{"id": 1, "name": "San Francisco"}],
+      "content": "<p>About Anthropic...</p><h3>Responsibilities</h3><ul><li>Build ML infrastructure at scale</li><li>Collaborate cross-functionally with research teams</li></ul><p>Tech we use: Python, PySpark &amp; Airflow.</p>",
+      "metadata": []
+    },
+    {
+      "id": 4567891,
+      "internal_job_id": 1234568,
+      "title": "Director of Engineering",
+      "updated_at": "2026-04-12T10:00:00Z",
+      "first_published": "2026-04-12T10:00:00Z",
+      "absolute_url": "https://job-boards.greenhouse.io/anthropic/jobs/4567891",
+      "location": {"name": "London, United Kingdom"},
+      "departments": [{"id": 100, "name": "Engineering"}],
+      "offices": [{"id": 2, "name": "London"}],
+      "content": "<p>Senior leadership role...</p>",
+      "metadata": []
+    },
+    {
+      "id": 4567892,
+      "internal_job_id": 1234569,
+      "title": "Senior Data Engineer",
+      "updated_at": "2026-04-08T10:00:00Z",
+      "first_published": "2026-04-08T10:00:00Z",
+      "absolute_url": "https://job-boards.greenhouse.io/anthropic/jobs/4567892",
+      "location": {"name": "Remote - United States"},
+      "departments": [],
+      "offices": [],
+      "content": "<p>Data engineering role with Iceberg and Spark.</p>",
+      "metadata": []
+    },
+    {
+      "id": 4567893,
+      "internal_job_id": 1234570,
+      "title": "Staff Software Engineer, Backend",
+      "updated_at": "2026-04-05T10:00:00Z",
+      "absolute_url": "https://job-boards.greenhouse.io/anthropic/jobs/4567893",
+      "location": {"name": "New York, NY"},
+      "departments": [{"id": 101, "name": "Backend"}],
+      "content": "<p>Staff-level role.</p>"
+    }
+  ],
+  "meta": {"total": 4}
+}

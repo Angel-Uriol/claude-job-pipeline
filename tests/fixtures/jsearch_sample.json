@@ -1,0 +1,80 @@
+{
+  "status": "OK",
+  "request_id": "fixture-0001",
+  "parameters": {
+    "query": "ML Data Engineer in California",
+    "page": 1,
+    "num_pages": 1
+  },
+  "data": [
+    {
+      "job_id": "opaque-hash-aaa111",
+      "employer_name": "Acme Corp",
+      "job_title": "ML Data Engineer",
+      "job_apply_link": "https://example.com/apply/aaa111",
+      "job_description": "<p>Build large-scale <b>PySpark</b> pipelines.</p>",
+      "job_city": "San Francisco",
+      "job_state": "California",
+      "job_country": "US",
+      "job_is_remote": false,
+      "job_posted_at_datetime_utc": "2026-05-15T00:00:00.000Z",
+      "job_posted_at_timestamp": 1778889600,
+      "job_employment_type": "FULLTIME"
+    },
+    {
+      "job_id": "opaque-hash-bbb222",
+      "employer_name": "Beta Inc",
+      "job_title": "Backend Software Engineer",
+      "job_apply_link": "https://example.com/apply/bbb222",
+      "job_description": "Build APIs in Python.",
+      "job_city": "Los Angeles",
+      "job_state": "California",
+      "job_country": "US",
+      "job_is_remote": false,
+      "job_posted_at_datetime_utc": "2026-05-14T00:00:00.000Z",
+      "job_posted_at_timestamp": 1778803200,
+      "job_employment_type": "FULLTIME"
+    },
+    {
+      "job_id": "opaque-hash-ccc333",
+      "employer_name": "Gamma LLC",
+      "job_title": "Marketing Manager",
+      "job_apply_link": "https://example.com/apply/ccc333",
+      "job_description": "Lead growth marketing.",
+      "job_city": "San Diego",
+      "job_state": "California",
+      "job_country": "US",
+      "job_is_remote": false,
+      "job_posted_at_datetime_utc": "2026-05-13T00:00:00.000Z",
+      "job_posted_at_timestamp": 1778716800,
+      "job_employment_type": "FULLTIME"
+    },
+    {
+      "job_id": "opaque-hash-ddd444",
+      "employer_name": "Delta AI",
+      "job_title": "ML Platform Engineer",
+      "job_apply_link": "https://example.com/apply/ddd444",
+      "job_description": "Own the ML platform.",
+      "job_city": "",
+      "job_state": "",
+      "job_country": "US",
+      "job_is_remote": true,
+      "job_posted_at_datetime_utc": "2026-05-12T00:00:00.000Z",
+      "job_posted_at_timestamp": 1778630400,
+      "job_employment_type": "FULLTIME"
+    },
+    {
+      "job_id": "opaque-hash-eee555",
+      "employer_name": "Epsilon Labs",
+      "job_title": "Machine Learning Engineer",
+      "job_apply_link": "https://example.com/apply/eee555",
+      "job_description": "Production ML.",
+      "job_city": "Palo Alto",
+      "job_state": "California",
+      "job_country": "US",
+      "job_is_remote": false,
+      "job_posted_at_timestamp": 1778544000,
+      "job_employment_type": "FULLTIME"
+    }
+  ]
+}

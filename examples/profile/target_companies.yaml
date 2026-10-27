@@ -1,0 +1,29 @@
+# Target companies — EXAMPLE.
+#
+# When a scraped job's company matches an entry below, the pipeline:
+#   1. flags the job as a TARGET (badge in the UI), and
+#   2. adds a tier-weighted bump to its fit score (see `boost_by_tier`),
+#      which can nudge its verdict up (consider -> apply).
+#
+# Matching is case-insensitive and ignores punctuation + suffixes like
+# "Inc" — but it is EXACT on the normalized name ("box" never matches
+# "dropbox"). Add `aliases` for alternate names a job board might use.
+#
+# The setup questionnaire writes your own list to
+# profile/target_companies.yaml (Claude suggests companies, you prune).
+
+# Points added to a target company's fit score (1-10 scale, capped at 10).
+boost_by_tier:
+  1: 0.7   # dream companies
+  2: 0.5   # strong interest
+  3: 0.3   # worth a look
+
+companies:
+  - {name: stripe,     tier: 1, aliases: []}
+  - {name: databricks, tier: 1, aliases: []}
+  - {name: cloudflare, tier: 1, aliases: []}
+  - {name: datadog,    tier: 2, aliases: []}
+  - {name: notion,     tier: 2, aliases: [notion labs]}
+  - {name: linear,     tier: 2, aliases: []}
+  - {name: palantir,   tier: 3, aliases: [palantir technologies]}
+  - {name: uber,       tier: 3, aliases: []}

@@ -1,0 +1,35 @@
+You are helping me find every open role that fits my profile at SEVERAL companies in one
+pass. For EACH company below, check its careers site AND Google Jobs, LinkedIn
+(filtered to that company), and Greenhouse / Lever / Ashby. Verify every role
+live today on a page you actually open — never invent roles. Return all matches
+as structured JSON, one job per line. I'll paste your output back into my pipeline.
+
+# Companies to search (visit every one)
+
+{TARGETS}
+
+{PROFILE}
+
+# Output format
+
+For each matching job, return ONE JSON object on its own line. Schema:
+
+  {{"company": "<the lowercase company name listed above>", "job_id": "<unique-id-or-slug>", "title": "<role title>", "team": "<team or department or null>", "url": "<full apply URL>", "location": "<as listed>", "posted_date": "<ISO 8601 or null>", "description": "<full JD text, no HTML>"}}
+
+Rules:
+- Search EVERY company listed above, not just the first.
+- Set "company" to the company the job belongs to (the lowercase name above).
+- Return up to ~10 of the strongest matching roles per company, ordered by fit.
+- Only include roles verified live today on a source you actually opened; every
+  `url` must be a working apply link. Never invent roles or URLs.
+- Skip closed/filled postings.
+- For hardware roles, also include Junior/Associate/Entry-level (career pivot).
+- Use null (not empty string) for unknown optional fields; company, title,
+  url, description are required.
+- Capture the FULL job description verbatim in `description` (responsibilities +
+  requirements + qualifications) — do NOT summarize; it feeds both the fit scorer
+  and the resume generator.
+- Output NOTHING ELSE — no preamble, no commentary, no markdown. Just
+  one JSON object per line.
+
+Begin.

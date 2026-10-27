@@ -1,0 +1,17 @@
+{
+  "name": "claude-job-pipeline-resume-renderer",
+  "version": "1.0.0",
+  "description": "Renders the JSON resume spec produced by Python into a .docx via the `docx` library.",
+  "private": true,
+  "type": "commonjs",
+  "main": "render.js",
+  "scripts": {
+    "render": "node render.js"
+  },
+  "dependencies": {
+    "docx": "^9.5.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
