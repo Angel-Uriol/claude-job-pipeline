@@ -40,10 +40,9 @@ Open **http://localhost:8766**. The first visit takes you to the **Setup** page:
 |---|---|
 | 1. Install | One click installs what's still missing: the resume renderer, and (optionally) the Claude Code CLI via Anthropic's official installer. |
 | 2. Connect Claude | Paste an Anthropic API key, **or** use your local Claude Code login (see below). |
-| 3. Resume | Upload a PDF, DOCX or TXT. Claude parses it into `profile/resume_content.yaml`. |
-| 4. Questionnaire | Claude interviews you one question at a time: target roles (ranked), level, locations/remote, work authorization, core skills, honest gaps, deal-breakers, dream companies. |
-| 5. Companies | Claude suggests 20–40 employers that fit you; you prune or add, and the app checks which have a public job board. |
-| 6. Review & save | See the three generated YAML files, then save. |
+| 3. Your profile | One chat with Claude, mostly tap-to-answer options. It starts with "Do you have a resume?" — upload it right in the chat, or say no and Claude builds one with you (industry, experience, projects). Then three rounds: **About you** → Claude scans real open postings → **What the market asks** ("3 of the 8 roles I found ask for Kafka — have you used it?") → a second, sharper scan → **Sharpen**. |
+| 4. Companies | Pre-filled with the employers found during the scans (job boards already verified); trim, add, re-check. |
+| 5. Review & save | See the three generated YAML files, then save. |
 
 Then go to **Discover** and press **Run daily**.
 

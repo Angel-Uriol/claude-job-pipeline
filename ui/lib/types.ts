@@ -323,10 +323,24 @@ export interface FilterState {
 
 export type AuthMode = "api_key" | "claude_code";
 
+export interface MarketJob {
+  company: string;
+  title: string;
+  url: string;
+  location: string;
+}
+
 export interface SetupMessage {
   role: "assistant" | "user";
   text: string;
+  options: string[];
+  multi: boolean;
+  kind: "text" | "upload" | "market" | "note";
+  jobs: MarketJob[];
 }
+
+export type SetupPhase =
+  | "start" | "upload" | "round1" | "market1" | "round2" | "market2" | "round3" | "done";
 
 export interface SetupCompany {
   name: string;
@@ -347,6 +361,10 @@ export interface SetupInterview {
   required_total: number;
   optional: Record<string, string>;
   done: boolean;
+  phase: SetupPhase;
+  round: number;
+  round_names: Record<string, string>;
+  resume_mode: "unknown" | "upload" | "build";
   resume: { parsed: boolean; name: string | null; roles: number; bullets: number };
   companies: SetupCompany[];
 }

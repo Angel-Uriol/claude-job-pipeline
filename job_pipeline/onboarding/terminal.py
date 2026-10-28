@@ -17,7 +17,15 @@ from ..config import LLMSettings, load_config, load_secrets
 from ..llm import LLMError, build_llm, self_check
 from .companies import suggest_companies, verify_companies
 from .env_file import mask, set_env_values
-from .interview import InterviewState, prefill_from_resume, step
+from .interview import (
+    UPLOAD_OPTIONS,
+    InterviewState,
+    Message,
+    resume_received,
+    start,
+    step,
+)
+from .market import run_market
 from .resume_intake import parse_resume_file
 from .writer import build_files, write_files
 
@@ -78,6 +86,26 @@ def run_auth(mode: str | None = None) -> int:
     return 0 if info["ok"] else 1
 
 
+def _print_message(m: Message) -> None:
+    if m.role != "assistant":
+        return
+    print("\nClaude: " + textwrap.fill(m.text, width=88, subsequent_indent="        "))
+    for j in m.jobs:
+        print(f"   • {j['title']} — {j['company']}")
+    for i, opt in enumerate(m.options, 1):
+        print(f"   {i}) {opt}")
+    if m.options:
+        print("   (type a number, several like 1,3, or your own answer)")
+
+
+def _resolve_options(answer: str, options: list[str]) -> str:
+    """'2' or '1,3' → the option text; anything else passes through."""
+    parts = [p.strip() for p in answer.split(",")]
+    if options and all(p.isdigit() and 1 <= int(p) <= len(options) for p in parts):
+        return ", ".join(options[int(p) - 1] for p in parts)
+    return answer
+
+
 def run_setup(resume_path: str | None = None, restart: bool = False) -> int:
     """Interactive questionnaire → profile files."""
     models = _models()
@@ -91,42 +119,47 @@ def run_setup(resume_path: str | None = None, restart: bool = False) -> int:
     if state.messages and not restart:
         print("Resuming your saved setup (use --restart to start over).")
 
-    # 1. resume
-    if state.resume_content is None:
-        path = resume_path or input(
-            "Path to your resume (PDF/DOCX/TXT), or Enter to skip: "
-        ).strip()
-        if path:
-            print("Reading your resume with Claude …")
-            try:
-                content = parse_resume_file(Path(path).expanduser(), llm=llm,
-                                            model=models.smart_model)
-            except (ValueError, OSError, LLMError) as e:
-                print(f"Couldn't parse that resume: {e}")
-                return 1
-            prefill_from_resume(state, content)
-            exps = content.get("experiences") or {}
-            print(f"Got it — {len(exps)} roles, "
-                  f"{sum(len(e.get('bullets') or []) for e in exps.values())} bullets.")
-            state.save()
-
-    # 2. interview
-    print("\nA few questions so the search fits you. Type 'skip' to skip an optional one.\n")
-    if not state.messages or state.messages[-1].role == "user":
-        state = step(state, None, llm=llm, model=models.fast_model)
+    # 1-2. the chat: resume choice → three rounds (with live job scans)
+    start(state)
+    if resume_path and state.phase == "start":
+        state = step(state, "Yes, I'll upload it", llm=llm, model=models.fast_model)
+    printed = 0
     while not state.done:
-        print(f"Claude: {state.messages[-1].text}")
+        for m in state.messages[printed:]:
+            _print_message(m)
+        printed = len(state.messages)
         try:
+            if state.phase in ("market1", "market2"):
+                print("  … scanning real job postings (this takes ~30s) …")
+                state = run_market(state, llm=llm, model=models.fast_model)
+                continue
+            if state.phase == "upload":
+                path = resume_path or input("Resume path (or Enter if you don't have one): ")
+                resume_path = None
+                if not path.strip():
+                    state = step(state, UPLOAD_OPTIONS[0], llm=llm, model=models.fast_model)
+                    continue
+                print("  … reading your resume with Claude …")
+                try:
+                    content = parse_resume_file(Path(path.strip()).expanduser(), llm=llm,
+                                                model=models.smart_model)
+                except (ValueError, OSError, LLMError) as e:
+                    print(f"  Couldn't parse that resume: {e}")
+                    continue
+                resume_received(state, content)
+                state = step(state, None, llm=llm, model=models.fast_model)
+                continue
             answer = input("You: ").strip()
         except (EOFError, KeyboardInterrupt):
             print("\nSaved — run `job-pipeline setup` again to continue.")
             return 1
-        if not answer:
-            continue
-        state = step(state, answer, llm=llm, model=models.fast_model)
-    print(f"Claude: {state.messages[-1].text}\n")
+        if answer:
+            state = step(state, _resolve_options(answer, state.messages[-1].options),
+                         llm=llm, model=models.fast_model)
+    for m in state.messages[printed:]:
+        _print_message(m)
 
-    # 3. companies
+    # 3. companies (the market scans already found some — verified)
     if not state.companies:
         print("Finding companies that fit your profile …")
         state.companies = suggest_companies(state.draft, llm=llm, model=models.smart_model)

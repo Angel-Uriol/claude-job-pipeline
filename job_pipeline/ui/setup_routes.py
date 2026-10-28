@@ -26,12 +26,17 @@ from ..onboarding import login as claude_login
 from ..onboarding.companies import suggest_companies, verify_companies
 from ..onboarding.env_file import mask, set_env_values
 from ..onboarding.interview import (
+    BUILD_FIELDS,
     OPTIONAL_FIELDS,
     REQUIRED_FIELDS,
+    ROUND_NAMES,
     InterviewState,
-    prefill_from_resume,
+    field_label,
+    resume_received,
+    start,
     step,
 )
+from ..onboarding.market import run_market
 from ..onboarding.resume_intake import parse_resume_file
 from ..onboarding.system import install, system_checks
 from ..onboarding.writer import build_files, write_files
@@ -82,10 +87,14 @@ def _state_payload(state: InterviewState) -> dict[str, Any]:
     return {
         "messages": [m.model_dump() for m in state.messages],
         "draft": state.draft.model_dump(exclude_none=True),
-        "missing": [{"field": f, "label": REQUIRED_FIELDS[f]} for f in state.missing()],
-        "required_total": len(REQUIRED_FIELDS),
+        "missing": [{"field": f, "label": field_label(f)} for f in state.missing()],
+        "required_total": len(REQUIRED_FIELDS) + (len(BUILD_FIELDS) if state.build_mode else 0),
         "optional": OPTIONAL_FIELDS,
         "done": state.done,
+        "phase": state.phase,
+        "round": state.round,
+        "round_names": ROUND_NAMES,
+        "resume_mode": state.resume_mode,
         "resume": {
             "parsed": state.resume_content is not None,
             "name": ((state.resume_content or {}).get("header") or {}).get("name"),
@@ -185,18 +194,38 @@ def register_setup_routes(app: FastAPI) -> None:
             except (ValueError, LLMError, ValidationError) as e:
                 raise HTTPException(422, f"Couldn't parse that resume: {e}") from e
         state = InterviewState.load()
-        prefill_from_resume(state, content)
-        state.save()
+        resume_received(state, content)
+        try:
+            state = await asyncio.to_thread(step, state, None, llm=llm,
+                                            model=_models().fast_model)
+        except LLMError as e:
+            state.save()
+            raise HTTPException(502, str(e)) from e
         return _state_payload(state)
 
     @app.post("/api/setup/interview")
     async def setup_interview(body: InterviewBody) -> dict[str, Any]:
-        llm = _llm()
         state = InterviewState.load()
+        if not state.messages:
+            # Opening question is static — no Claude call needed.
+            return _state_payload(start(state))
+        llm = _llm()
         try:
             state = await asyncio.to_thread(
                 step, state, body.message or None, llm=llm, model=_models().fast_model
             )
+        except LLMError as e:
+            raise HTTPException(502, str(e)) from e
+        return _state_payload(state)
+
+    @app.post("/api/setup/market")
+    async def setup_market() -> dict[str, Any]:
+        """Scan live postings between rounds, then ask the next round's first question."""
+        llm = _llm()
+        state = InterviewState.load()
+        try:
+            state = await asyncio.to_thread(run_market, state, llm=llm,
+                                            model=_models().fast_model)
         except LLMError as e:
             raise HTTPException(502, str(e)) from e
         return _state_payload(state)

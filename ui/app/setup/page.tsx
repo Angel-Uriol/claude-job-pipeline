@@ -1,10 +1,10 @@
-// Setup — first-run wizard. Six steps, each backed by /api/setup/*:
+// Setup — first-run wizard. Five steps, each backed by /api/setup/*:
 //   0. Install            one-click install of the resume renderer + Claude Code CLI
 //   1. Connect Claude     API key (default) or your local Claude Code login
-//   2. Resume             upload → Claude parses it into resume_content
-//   3. Questionnaire      Claude interviews you until the profile is complete
-//   4. Companies          Claude suggests targets → we find their job boards
-//   5. Review & save      see the generated YAML, then write profile/
+//   2. Your profile       one chat: resume (upload or build) + 3 rounds of
+//                         questions with live job scans in between
+//   3. Companies          pre-filled from the scans; trim, add, find job boards
+//   4. Review & save      see the generated YAML, then write profile/
 // All progress is saved server-side (profile/.interview.json), so a reload
 // or coming back later resumes where you left off.
 
@@ -13,6 +13,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import ProfileChat from "@/components/ProfileChat";
 import { ApiError, api } from "@/lib/api";
 import type {
   AuthMode,
@@ -23,15 +24,14 @@ import type {
   LoginStatus,
 } from "@/lib/types";
 
-type Step = 0 | 1 | 2 | 3 | 4 | 5;
+type Step = 0 | 1 | 2 | 3 | 4;
 
 const STEPS: { n: Step; label: string }[] = [
   { n: 0, label: "Install" },
   { n: 1, label: "Connect Claude" },
-  { n: 2, label: "Resume" },
-  { n: 3, label: "Questionnaire" },
-  { n: 4, label: "Companies" },
-  { n: 5, label: "Review & save" },
+  { n: 2, label: "Your profile" },
+  { n: 3, label: "Companies" },
+  { n: 4, label: "Review & save" },
 ];
 
 const CARD =
@@ -52,10 +52,9 @@ function firstOpenStep(s: SetupStatus, checks: SystemCheck[]): Step {
   if (checks.some((c) => !c.ok && !c.optional)) return 0;
   if (!s.auth.connected) return checks.every((c) => c.ok) ? 1 : 0;
   const iv = s.interview;
-  if (!iv.resume.parsed && iv.messages.length === 0) return 2;
-  if (!iv.done) return 3;
-  if (iv.companies.length === 0 || !iv.companies.some((c) => c.platform !== undefined)) return 4;
-  return 5;
+  if (!iv.done) return 2;
+  if (iv.companies.length === 0 || !iv.companies.some((c) => c.platform !== undefined)) return 3;
+  return 4;
 }
 
 export default function SetupPage() {
@@ -140,7 +139,7 @@ export default function SetupPage() {
           />
         )}
         {step === 2 && (
-          <ResumeStep
+          <ProfileChat
             interview={interview}
             onError={setError}
             onUpdate={setInterview}
@@ -148,24 +147,16 @@ export default function SetupPage() {
           />
         )}
         {step === 3 && (
-          <InterviewStep
-            interview={interview}
-            onError={setError}
-            onUpdate={setInterview}
-            onNext={() => setStep(4)}
-          />
-        )}
-        {step === 4 && (
           <CompaniesStep
             // Remount (fresh local edits) whenever the server's list changes.
             key={JSON.stringify(interview.companies)}
             interview={interview}
             onError={setError}
             onUpdate={setInterview}
-            onNext={() => setStep(5)}
+            onNext={() => setStep(4)}
           />
         )}
-        {step === 5 && <ReviewStep configured={status.configured} onError={setError} onSaved={load} />}
+        {step === 4 && <ReviewStep configured={status.configured} onError={setError} onSaved={load} />}
       </div>
     </main>
   );
@@ -527,207 +518,7 @@ function ClaudeLogin({
   );
 }
 
-// ===== step 2: resume =====
-
-function ResumeStep({
-  interview,
-  onError,
-  onUpdate,
-  onNext,
-}: {
-  interview: SetupInterview;
-  onError: (m: string | null) => void;
-  onUpdate: (iv: SetupInterview) => void;
-  onNext: () => void;
-}) {
-  const [busy, setBusy] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  const upload = async (file: File) => {
-    setBusy(true);
-    onError(null);
-    try {
-      onUpdate(await api.setupResume(file));
-    } catch (e) {
-      onError(errText(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <section className={CARD}>
-      <h2 className="text-lg font-semibold">Upload your resume</h2>
-      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-        Claude extracts your experience, bullets, education and skills exactly as written — no
-        invented facts, metrics kept verbatim. It becomes the source for every tailored resume.
-      </p>
-
-      <div
-        className="mt-4 flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 p-8 text-center dark:border-slate-700"
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={(e) => {
-          e.preventDefault();
-          const f = e.dataTransfer.files?.[0];
-          if (f) void upload(f);
-        }}
-      >
-        <p className="text-sm text-slate-600 dark:text-slate-300">Drop a PDF, DOCX or TXT here</p>
-        <button type="button" className={`mt-3 ${BTN_GHOST}`} disabled={busy} onClick={() => fileRef.current?.click()}>
-          {busy ? "Reading with Claude… (up to a minute)" : "Choose file"}
-        </button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".pdf,.docx,.txt,.md"
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) void upload(f);
-          }}
-        />
-      </div>
-
-      {interview.resume.parsed && (
-        <p className="mt-4 text-sm text-emerald-700 dark:text-emerald-400">
-          ✓ Parsed {interview.resume.name ? `${interview.resume.name}'s` : "your"} resume:{" "}
-          {interview.resume.roles} roles, {interview.resume.bullets} bullets.
-        </p>
-      )}
-
-      <div className="mt-5 flex gap-3">
-        <button type="button" className={BTN} onClick={onNext} disabled={busy}>
-          {interview.resume.parsed ? "Continue" : "Skip — no resume"}
-        </button>
-      </div>
-    </section>
-  );
-}
-
-// ===== step 3: questionnaire =====
-
-function InterviewStep({
-  interview,
-  onError,
-  onUpdate,
-  onNext,
-}: {
-  interview: SetupInterview;
-  onError: (m: string | null) => void;
-  onUpdate: (iv: SetupInterview) => void;
-  onNext: () => void;
-}) {
-  const [text, setText] = useState("");
-  const [busy, setBusy] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const started = useRef(false);
-
-  const send = useCallback(
-    async (message: string) => {
-      setBusy(true);
-      onError(null);
-      try {
-        onUpdate(await api.setupInterview(message));
-        setText("");
-      } catch (e) {
-        onError(errText(e));
-      } finally {
-        setBusy(false);
-      }
-    },
-    [onError, onUpdate],
-  );
-
-  // Kick off (or resume) the interview with Claude's next question.
-  useEffect(() => {
-    const last = interview.messages[interview.messages.length - 1];
-    if (!started.current && (!last || last.role === "user")) {
-      started.current = true;
-      void send("");
-    }
-  }, [interview.messages, send]);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }, [interview.messages.length, busy]);
-
-  const total = interview.required_total;
-  const filled = total - interview.missing.length;
-
-  return (
-    <section className={CARD}>
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">A few questions</h2>
-        <span className="text-xs text-slate-500">
-          {interview.done ? "Complete" : `${filled}/${total} essentials`}
-        </span>
-      </div>
-      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-        <div className="h-full bg-indigo-500 transition-all" style={{ width: `${(filled / total) * 100}%` }} />
-      </div>
-
-      <div className="mt-4 max-h-[50vh] space-y-3 overflow-y-auto pr-1">
-        {interview.messages.map((m, i) => (
-          <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-            <div
-              className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2 text-sm ${
-                m.role === "user"
-                  ? "bg-indigo-600 text-white"
-                  : "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100"
-              }`}
-            >
-              {m.text}
-            </div>
-          </div>
-        ))}
-        {busy && <div className="text-xs text-slate-400">Claude is thinking…</div>}
-        <div ref={bottomRef} />
-      </div>
-
-      {interview.done ? (
-        <div className="mt-4 flex gap-3">
-          <button type="button" className={BTN} onClick={onNext}>
-            Choose target companies →
-          </button>
-        </div>
-      ) : (
-        <form
-          className="mt-4 flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (text.trim() && !busy) void send(text);
-          }}
-        >
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                if (text.trim() && !busy) void send(text);
-              }
-            }}
-            rows={2}
-            disabled={busy}
-            placeholder="Type your answer… (Shift+Enter for a new line, “skip” to skip)"
-            className={INPUT}
-          />
-          <button type="submit" className={BTN} disabled={busy || !text.trim()}>
-            Send
-          </button>
-        </form>
-      )}
-
-      {interview.missing.length > 0 && (
-        <p className="mt-3 text-xs text-slate-400">
-          Still needed: {interview.missing.map((m) => m.label).join(" · ")}
-        </p>
-      )}
-    </section>
-  );
-}
-
-// ===== step 4: companies =====
+// ===== step 3: companies =====
 
 const PLATFORM_BADGE: Record<string, string> = {
   greenhouse: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
@@ -865,7 +656,7 @@ function CompaniesStep({
   );
 }
 
-// ===== step 5: review & save =====
+// ===== step 4: review & save =====
 
 function ReviewStep({
   configured,

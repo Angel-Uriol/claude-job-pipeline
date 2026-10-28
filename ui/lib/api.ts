@@ -127,6 +127,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ message }),
     }),
+  setupMarket: () => request<SetupInterview>("/api/setup/market", { method: "POST" }),
   setupSuggestCompanies: () =>
     request<SetupInterview>("/api/setup/companies/suggest", { method: "POST" }),
   setupVerifyCompanies: (companies: SetupCompany[]) =>

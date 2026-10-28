@@ -1,24 +1,36 @@
-"""The LLM-run setup questionnaire.
+"""The LLM-run setup chat: resume → three rounds of questions → profile.
 
-Claude interviews the job seeker, one question at a time, until it has every
-field the pipeline needs (the ``profile:`` section of config.yaml plus the
-location tokens the scrape filter uses). Each turn:
+The chat moves through phases (``InterviewState.phase``):
 
-  1. We send Claude the current draft, which required fields are still
-     missing, a digest of the parsed resume, and the recent conversation.
-  2. Claude returns ``{updates, next_question, done}`` as structured output.
-  3. We merge ``updates`` into the draft in code, and decide ``done`` in code
-     too — the model can say "done", but we keep asking until every required
-     field is filled. So a chatty model can't end setup early.
+    start ──► upload ──┐                     (have a resume → drop it in)
+      └────────────────┴► round1 ──► market1 ──► round2 ──► market2 ──► round3 ──► done
+                          About you   live jobs   What the    live jobs   Sharpen
+                                                  market asks
 
-State lives in ``InterviewState`` and is saved to ``profile/.interview.json``
-after every turn, so the web page or terminal can resume where it stopped.
-The same engine powers both the Setup page and ``job-pipeline setup``.
+* **start** — "Do you have a resume?" (no LLM call). No resume → Claude also
+  collects industry, experience, projects and education, and drafts a resume
+  from them at the end (resume_builder.py).
+* **round1** — the basics: target roles (tiered), level, locations, work
+  authorization, skills, honest gaps.
+* **market1 / market2** — real postings are scanned (market.py) and the
+  requirements they share are summarized for the next round.
+* **round2** — "Several postings I found require X — have you used it?"
+* **round3** — a second, sharper scan → final adjustments.
+
+Each turn Claude returns ``{updates, next_question, options, multi_select,
+done}``. Code — not the model — decides when a round ends: round 1 needs every
+required field; rounds 2 and 3 are capped at a few questions. Questions are
+mostly multiple choice (``options``), with free text always allowed.
+
+State is saved to ``profile/.interview.json`` after every turn so the page
+or terminal can resume. The same engine powers the web chat and
+``job-pipeline setup``.
 """
 
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any, Literal
 
@@ -30,6 +42,32 @@ from ..llm import ClaudeClient
 # How many past messages Claude sees each turn (the draft carries the rest).
 HISTORY_WINDOW = 16
 
+Phase = Literal["start", "upload", "round1", "market1", "round2", "market2", "round3", "done"]
+
+#: Which of the three rounds a phase belongs to (for the progress header).
+ROUND_OF: dict[str, int] = {
+    "start": 1, "upload": 1, "round1": 1, "market1": 2, "round2": 2,
+    "market2": 3, "round3": 3, "done": 3,
+}
+ROUND_NAMES = {1: "About you", 2: "What the market asks", 3: "Sharpen"}
+# Max questions Claude may ask in the market-driven rounds.
+ROUND_LIMITS = {"round2": 5, "round3": 4}
+# Safety valve: round 1 ends after this many questions even if a field is
+# still missing (it can be edited on the review screen).
+ROUND1_MAX = 18
+
+START_TEXT = (
+    "Hi! I'm your job-search co-pilot. I'll ask a few quick questions, look at real "
+    "openings while we talk, and set everything up for you.\n\n"
+    "First things first — do you have a resume you can share?"
+)
+START_OPTIONS = ["Yes, I'll upload it", "No, let's build one together"]
+UPLOAD_TEXT = (
+    "Perfect — drop it here (PDF, DOCX or TXT). "
+    "I'll read it and only ask about what's missing."
+)
+UPLOAD_OPTIONS = ["Actually, I don't have one"]
+
 
 # --- the draft profile ---------------------------------------------------
 
@@ -40,9 +78,31 @@ class FunctionDraft(BaseModel):
     notes: str = ""
 
 
+class ExperienceDraft(BaseModel):
+    company: str
+    title: str
+    location: str = ""
+    start: str = ""
+    end: str = ""
+    highlights: list[str] = Field(default_factory=list)
+
+
+class ProjectDraft(BaseModel):
+    name: str
+    description: str = ""
+    stack: str = ""
+
+
+class EducationDraft(BaseModel):
+    school: str
+    degree: str = ""
+    end: str = ""
+
+
 class ProfileDraft(BaseModel):
-    """Everything the questionnaire collects. Mirrors `config.Profile`, plus
-    the pipeline-side location fields. All optional while in progress."""
+    """Everything the chat collects. Mirrors `config.Profile`, plus
+    pipeline-side fields (location tokens, search keywords) and — when the
+    user has no resume — the raw material for drafting one."""
 
     name: str | None = None
     email: str | None = None
@@ -50,11 +110,13 @@ class ProfileDraft(BaseModel):
     linkedin: str | None = None
     location: str | None = None
     headline: str | None = None
+    industry: str | None = None
     years_experience: int | None = None
     work_authorization: str | None = None
     needs_sponsorship: bool | None = None
     target_levels: list[str] | None = None
     target_functions: list[FunctionDraft] | None = None
+    search_keywords: list[str] | None = None
     must_have_skills: list[str] | None = None
     preferred_skills: list[str] | None = None
     excluded_titles: list[str] | None = None
@@ -67,6 +129,10 @@ class ProfileDraft(BaseModel):
     deal_breakers: list[str] | None = None
     dream_companies: list[str] | None = None
     excluded_companies: list[str] | None = None
+    # Resume-building material (no-resume path).
+    experience_entries: list[ExperienceDraft] | None = None
+    projects: list[ProjectDraft] | None = None
+    education: list[EducationDraft] | None = None
 
 
 # Field -> the plain-English thing we still need (shown to Claude + the UI).
@@ -85,7 +151,15 @@ REQUIRED_FIELDS: dict[str, str] = {
     "honest_gaps": "skills they do NOT have in production (can be 'none')",
 }
 
-# Nice to have — Claude asks about these after the required ones, briefly.
+# Extra essentials when we're building the resume from the chat.
+BUILD_FIELDS: dict[str, str] = {
+    "industry": "industry / field they work in",
+    "experience_entries": "work experience (company, title, dates, what they did) — or 'none'",
+    "projects": "projects worth showing (school, personal, freelance) — or 'none'",
+    "education": "education",
+}
+
+# Nice to have — asked briefly after the required ones.
 OPTIONAL_FIELDS: dict[str, str] = {
     "excluded_titles": "title words that mean 'too senior / wrong role'",
     "salary_floor": "minimum acceptable compensation",
@@ -95,14 +169,22 @@ OPTIONAL_FIELDS: dict[str, str] = {
     "excluded_companies": "companies to never show (current employer, etc.)",
 }
 
+# Fields where an empty list is a valid, deliberate answer.
+_EMPTY_OK = {"honest_gaps", "experience_entries", "projects", "education"}
 
-def missing_required(draft: ProfileDraft) -> list[str]:
+
+def missing_required(draft: ProfileDraft, build_mode: bool = False) -> list[str]:
+    fields = {**REQUIRED_FIELDS, **(BUILD_FIELDS if build_mode else {})}
     out: list[str] = []
-    for f in REQUIRED_FIELDS:
+    for f in fields:
         v = getattr(draft, f)
-        if v is None or (isinstance(v, (list, str)) and not v and f != "honest_gaps"):
+        if v is None or (isinstance(v, (list, str)) and not v and f not in _EMPTY_OK):
             out.append(f)
     return out
+
+
+def field_label(f: str) -> str:
+    return {**REQUIRED_FIELDS, **BUILD_FIELDS}.get(f, f)
 
 
 # --- what Claude returns each turn --------------------------------------
@@ -114,9 +196,15 @@ class InterviewTurn(BaseModel):
         description="ONLY fields the user's latest answer settles. Lists are full replacements.",
     )
     next_question: str = Field(
-        description="The next single question to ask (or a short wrap-up when done)."
+        description="The next single question (or a one-line wrap-up when done)."
     )
-    done: bool = Field(description="True when nothing important is left to ask.")
+    options: list[str] = Field(
+        default_factory=list,
+        description="2-6 short answer choices for the question. Empty only for "
+        "truly open questions (name, email, a description).",
+    )
+    multi_select: bool = Field(default=False, description="True if several options may apply.")
+    done: bool = Field(description="True when nothing important is left to ask in this round.")
 
 
 # --- persisted state ------------------------------------------------------
@@ -125,19 +213,41 @@ class InterviewTurn(BaseModel):
 class Message(BaseModel):
     role: Literal["assistant", "user"]
     text: str
+    options: list[str] = Field(default_factory=list)
+    multi: bool = False
+    # text | upload (show a drop zone) | market (job cards) | note (status line)
+    kind: Literal["text", "upload", "market", "note"] = "text"
+    jobs: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class InterviewState(BaseModel):
     draft: ProfileDraft = Field(default_factory=ProfileDraft)
     messages: list[Message] = Field(default_factory=list)
+    phase: Phase = "start"
+    resume_mode: Literal["unknown", "upload", "build"] = "unknown"
     done: bool = False
-    # Parsed resume (ResumeContent as a dict) once uploaded.
+    # Parsed (or chat-built) resume as a ResumeContent dict.
     resume_content: dict[str, Any] | None = None
-    # Company step: suggestions [{name, tier, why}] and board probe results.
+    # Company step: [{name, tier, why, selected, platform?, slug?, jobs?}]
     companies: list[dict[str, Any]] = Field(default_factory=list)
+    # One entry per market scan: {round, summary, jobs, requirements}.
+    market: list[dict[str, Any]] = Field(default_factory=list)
+    # Questions Claude has asked in the current phase (caps rounds 2-3).
+    round_questions: int = 0
+
+    @property
+    def build_mode(self) -> bool:
+        return self.resume_mode == "build"
+
+    @property
+    def round(self) -> int:
+        return ROUND_OF[self.phase]
 
     def missing(self) -> list[str]:
-        return missing_required(self.draft)
+        return missing_required(self.draft, self.build_mode)
+
+    def say(self, text: str, **kw: Any) -> None:
+        self.messages.append(Message(role="assistant", text=text, **kw))
 
     def save(self, path: Path | None = None) -> None:
         p = path or paths.interview_state_path()
@@ -149,7 +259,10 @@ class InterviewState(BaseModel):
         p = path or paths.interview_state_path()
         if not p.exists():
             return cls()
-        return cls.model_validate_json(p.read_text(encoding="utf-8"))
+        try:
+            return cls.model_validate_json(p.read_text(encoding="utf-8"))
+        except ValueError:
+            return cls()  # older/corrupt state file → start fresh
 
     @classmethod
     def reset(cls, path: Path | None = None) -> InterviewState:
@@ -160,34 +273,58 @@ class InterviewState(BaseModel):
 
 # --- prompts ------------------------------------------------------------
 
-SYSTEM_PROMPT = """You are a warm, efficient career coach running a short intake
-interview for a job-search tool. Your job is to fill in the candidate's
-profile so the tool can find and score jobs for them.
+SYSTEM_PROMPT = """You are a warm, upbeat career co-pilot running a short intake chat
+for a job-search tool. You fill in the candidate's profile so the tool can find
+and score real jobs for them.
 
-Rules:
-- Ask ONE clear question at a time (you may group 2 tightly related things,
-  e.g. "work authorization and whether you need sponsorship").
-- Prefer what the resume already says; confirm it briefly instead of asking
-  from scratch.
-- Ask about REQUIRED fields first, then a few optional ones, then finish.
-- Extract structured values from the user's answers into `updates`. Only put
-  fields the latest answer actually settles. For list fields send the full
-  updated list.
-- target_functions: name each kind of role and give it a tier — A = best fit,
-  B = good fit, C = stretch / career pivot.
-- location_tokens: lowercase substrings that would appear in a matching job
-  location string. Include city names, metro names, state names and state
-  abbreviations written like ", tx". Do NOT include "remote" here — set
-  allow_remote instead.
-- excluded_titles: lowercase single words or short phrases (e.g. "director",
-  "principal", "intern").
-- HONESTY: never invent experience, skills, metrics or credentials. If the
-  user is unsure, record only what they actually said. honest_gaps can be
-  an empty list if they say they have none.
-- Keep questions short and friendly. No lectures, no markdown headings.
-- Set done=true only when the required fields are filled and you've asked
-  about the optional ones (skips are fine). Then next_question is a one-line
-  wrap-up telling them the next step is choosing target companies."""
+Style:
+- ONE short question at a time (you may pair 2 tightly related things).
+- Prefer MULTIPLE CHOICE: give 2-6 short `options` (a few words each) that
+  cover the likely answers. The user can always type their own answer, so
+  don't add an "Other" option. Use free text (empty options) only for
+  things like name, email, or "describe what you did".
+- Set multi_select=true when several options can apply (skills, locations).
+- Friendly and concise. No markdown headings, no lists in questions.
+- Confirm what the resume already says instead of asking from scratch.
+
+Extraction:
+- Put into `updates` ONLY fields the latest answer settles. Lists are full
+  replacements — send the whole updated list.
+- target_functions: each kind of role with a tier — A best fit, B good fit,
+  C stretch / career pivot.
+- search_keywords: 3-6 job-title phrases to search for (e.g. "data engineer",
+  "analytics engineer"), derived from target_functions.
+- location_tokens: lowercase substrings that appear in matching job location
+  strings (cities, metro names, state names, abbreviations like ", tx"). Never
+  "remote" — set allow_remote instead.
+- excluded_titles: lowercase words like "director", "intern".
+- HONESTY: never invent experience, skills, metrics or credentials. Record
+  only what the user actually said. honest_gaps may be an empty list."""
+
+ROUND_GUIDE = {
+    "round1": """ROUND 1 — About you. Cover the required fields first, then briefly
+ask about a couple of optional ones. Set done=true when the required list is
+empty and you've touched the optional ones (skips are fine); then
+next_question is a one-line wrap-up saying you'll now look at real openings.""",
+    "round1_build": """The candidate has NO resume, so we'll draft one together.
+Early on, ask their industry, then work experience (company, title, rough
+dates, 1-3 things they did — with numbers if they have them), notable
+projects, and education. Store them in experience_entries / projects /
+education. 'None' is a fine answer (send an empty list).""",
+    "round2": """ROUND 2 — What the market asks. Below are requirements from REAL
+postings we just scanned. Ask about the important ones the profile doesn't
+already confirm, like: "3 of the 8 roles I found ask for Kubernetes — have you
+used it?" with options such as "Yes, in production" / "Some — projects or
+coursework" / "Not yet". Map answers: production → preferred_skills (and a
+highlight if they give a concrete example); some → preferred_skills plus a
+note in honest_gaps that it's not production; not yet → honest_gaps.
+Set done=true once the key gaps are covered.""",
+    "round3": """ROUND 3 — Sharpen. Using the second scan below, fine-tune: are the
+target levels and titles right given what's out there, any title words to
+exclude, salary floor vs. what postings show, deal-breakers, and which kinds
+of roles to prioritize (adjust target_functions tiers / search_keywords).
+Set done=true when you're confident; next_question is a one-line wrap-up.""",
+}
 
 
 def _resume_digest(content: dict[str, Any] | None) -> str:
@@ -215,17 +352,39 @@ def _resume_digest(content: dict[str, Any] | None) -> str:
     return "\n".join(lines)
 
 
+def _market_digest(state: InterviewState) -> str:
+    if not state.market:
+        return ""
+    m = state.market[-1]
+    reqs = "\n".join(
+        f"- {r.get('skill')}: in {r.get('count')} of {len(m.get('jobs') or [])} postings"
+        f"{' (already in profile)' if r.get('confirmed') else ''}"
+        for r in m.get("requirements") or []
+    )
+    jobs = "\n".join(f"- {j.get('title')} @ {j.get('company')}" for j in m.get("jobs") or [])
+    return f"# Live postings just scanned\n{jobs}\n\n# Common requirements\n{reqs}\n\n"
+
+
 def _turn_prompt(state: InterviewState) -> str:
     missing = state.missing()
-    missing_txt = "\n".join(f"- {f}: {REQUIRED_FIELDS[f]}" for f in missing) or "(none)"
+    missing_txt = "\n".join(f"- {f}: {field_label(f)}" for f in missing) or "(none)"
     optional_txt = "\n".join(
         f"- {f}: {desc}" for f, desc in OPTIONAL_FIELDS.items()
         if getattr(state.draft, f) is None
     ) or "(none)"
-    history = state.messages[-HISTORY_WINDOW:]
-    convo = "\n".join(f"{m.role.upper()}: {m.text}" for m in history) or "(interview not started)"
+    history = [m for m in state.messages if m.kind != "note"][-HISTORY_WINDOW:]
+    convo = "\n".join(
+        f"{m.role.upper()}: {m.text}"
+        + (f"  [options: {' | '.join(m.options)}]" if m.options else "")
+        for m in history
+    ) or "(chat not started)"
+    guide = ROUND_GUIDE[state.phase]
+    if state.phase == "round1" and state.build_mode:
+        guide += "\n\n" + ROUND_GUIDE["round1_build"]
     draft = state.draft.model_dump(exclude_none=True)
     return (
+        f"{guide}\n\n"
+        f"{_market_digest(state) if state.phase != 'round1' else ''}"
         "# Resume digest\n"
         f"{_resume_digest(state.resume_content)}\n\n"
         "# Profile draft so far\n"
@@ -243,9 +402,18 @@ def _turn_prompt(state: InterviewState) -> str:
 # --- engine ---------------------------------------------------------------
 
 
+def start(state: InterviewState) -> InterviewState:
+    """Post the opening question if the chat hasn't started. No LLM call."""
+    if not state.messages:
+        state.say(START_TEXT, options=START_OPTIONS)
+        state.save()
+    return state
+
+
 def prefill_from_resume(state: InterviewState, content: dict[str, Any]) -> None:
     """Seed the draft with header facts from a parsed resume (no LLM call)."""
     state.resume_content = content
+    state.resume_mode = "upload"
     h = content.get("header") or {}
     d = state.draft
     d.name = d.name or (h.get("name") or None)
@@ -258,12 +426,58 @@ def prefill_from_resume(state: InterviewState, content: dict[str, Any]) -> None:
         d.preferred_skills = [s.lower() for s in skills][:25] or None
 
 
+def resume_received(state: InterviewState, content: dict[str, Any]) -> None:
+    """Upload path: prefill, post a friendly note, move to round 1."""
+    prefill_from_resume(state, content)
+    exps = content.get("experiences") or {}
+    n_bullets = sum(len(e.get("bullets") or []) for e in exps.values())
+    name = ((content.get("header") or {}).get("name") or "").split(" ")[0]
+    state.say(
+        f"Got it{', ' + name if name else ''} — I read {len(exps)} roles and {n_bullets} "
+        "bullet points. I'll only ask about what your resume doesn't already say.",
+        kind="note",
+    )
+    state.phase = "round1"
+    state.round_questions = 0
+
+
 def _merge(draft: ProfileDraft, updates: ProfileDraft) -> None:
     """Copy every field the turn actually set (None = untouched)."""
     for field_name in updates.model_fields_set:
         value = getattr(updates, field_name)
         if value is not None:
             setattr(draft, field_name, value)
+
+
+def _wants_upload(text: str) -> bool:
+    t = text.lower()
+    if re.search(r"\b(no|nope|don't|dont|do not|without|build)\b", t):
+        return False
+    return bool(re.search(r"\b(yes|yeah|yep|sure|upload|have)\b", t))
+
+
+def _ask(state: InterviewState, *, llm: ClaudeClient, model: str) -> InterviewTurn:
+    turn = llm.structured(
+        _turn_prompt(state),
+        InterviewTurn,
+        model=model,
+        system=SYSTEM_PROMPT,
+        max_tokens=2000,
+        tool_name="submit_turn",
+        tool_description="Submit extracted profile updates and the next question.",
+    )
+    _merge(state.draft, turn.updates)
+    return turn
+
+
+def _end_round(state: InterviewState, turn: InterviewTurn) -> bool:
+    """Code-side decision: is the current round finished?"""
+    if state.phase == "round1":
+        if state.round_questions >= ROUND1_MAX:
+            return True
+        return turn.done and not state.missing()
+    limit = ROUND_LIMITS.get(state.phase, 5)
+    return turn.done or state.round_questions >= limit
 
 
 def step(
@@ -273,40 +487,76 @@ def step(
     llm: ClaudeClient,
     model: str,
 ) -> InterviewState:
-    """Run one interview turn and return the updated state (also saved).
+    """Advance the chat by one user answer and return the new state (saved).
 
-    `user_text=None` (or empty) asks the opening / next question without
-    recording a user message — used to start or resume the interview.
+    `user_text=None`/empty asks the next question without recording a user
+    message (used to start a round or resume). During `market*` phases this
+    is a no-op: the caller runs `market.run_market` instead.
     """
-    if user_text and user_text.strip():
-        state.messages.append(Message(role="user", text=user_text.strip()))
+    start(state)
+    text = (user_text or "").strip()
+    if text:
+        state.messages.append(Message(role="user", text=text))
 
-    turn = llm.structured(
-        _turn_prompt(state),
-        InterviewTurn,
-        model=model,
-        system=SYSTEM_PROMPT,
-        max_tokens=1500,
-        tool_name="submit_turn",
-        tool_description="Submit extracted profile updates and the next question.",
-    )
-    _merge(state.draft, turn.updates)
+    if state.phase == "start":
+        if not text:
+            return state
+        if _wants_upload(text):
+            state.phase, state.resume_mode = "upload", "upload"
+            state.say(UPLOAD_TEXT, kind="upload", options=UPLOAD_OPTIONS)
+            state.save()
+            return state
+        state.phase, state.resume_mode = "round1", "build"
+        text = ""  # the answer was the resume choice, not a profile fact
 
-    missing = state.missing()
-    state.done = bool(turn.done and not missing)
-    question = turn.next_question.strip()
-    if turn.done and missing:
-        # The model wanted to stop early — keep going on what's missing.
-        question = f"Before we wrap up — could you tell me your {REQUIRED_FIELDS[missing[0]]}?"
-    state.messages.append(Message(role="assistant", text=question))
+    if state.phase == "upload":
+        if not text:
+            return state
+        state.phase, state.resume_mode = "round1", "build"
+
+    if state.phase not in ("round1", "round2", "round3"):
+        state.save()
+        return state
+
+    turn = _ask(state, llm=llm, model=model)
+    if _end_round(state, turn):
+        _advance_after_round(state, turn.next_question)
+        if state.done:
+            from .resume_builder import finish
+
+            finish(state, llm=llm, model=model)
+    else:
+        state.round_questions += 1
+        missing = state.missing()
+        question = turn.next_question.strip()
+        options = turn.options[:6]
+        if turn.done and missing:
+            # The model wanted to stop early — keep going on what's missing.
+            question = f"Before we move on — could you tell me your {field_label(missing[0])}?"
+            options = []
+        state.say(question, options=options, multi=turn.multi_select and bool(options))
     state.save()
     return state
+
+
+def _advance_after_round(state: InterviewState, wrap_up: str) -> None:
+    state.round_questions = 0
+    if state.phase == "round1":
+        state.phase = "market1"
+        state.say(wrap_up.strip() or "Great — that's the basics.", kind="note")
+    elif state.phase == "round2":
+        state.phase = "market2"
+        state.say(wrap_up.strip() or "Thanks — that helps a lot.", kind="note")
+    else:
+        state.phase = "done"
+        state.done = True
 
 
 def draft_to_profile_dict(draft: ProfileDraft) -> dict[str, Any]:
     """Draft -> the `profile:` mapping of config.yaml (pipeline-only fields removed)."""
     d = draft.model_dump(exclude_none=True)
-    for k in ("location_tokens", "allow_remote", "excluded_companies"):
+    for k in ("location_tokens", "allow_remote", "excluded_companies", "industry",
+              "search_keywords", "experience_entries", "projects", "education"):
         d.pop(k, None)
     d.setdefault("name", "")
     d.setdefault("email", "")
