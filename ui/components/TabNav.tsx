@@ -13,6 +13,8 @@ import ThemeToggle from "./ThemeToggle";
 const TABS: { href: string; label: string }[] = [
   { href: "/", label: "Discover" },
   { href: "/track", label: "Track" },
+  { href: "/compare", label: "Compare" },
+  { href: "/interview", label: "Interview prep" },
   { href: "/setup", label: "Setup" },
 ];
 
@@ -21,9 +23,11 @@ export default function TabNav() {
 
   return (
     <nav className="sticky top-0 z-20 border-b border-slate-200 bg-slate-50/80 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
-      <div className="mx-auto flex max-w-[1200px] items-center justify-between px-4 py-2">
-        <div className="flex items-center gap-1">
-          <span className="mr-2 text-sm font-bold tracking-tight text-slate-900 dark:text-slate-50">
+      <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-2 px-4 py-2">
+        {/* One row on every screen: tabs scroll sideways on phones instead of
+            wrapping into a tall sticky bar that covers the page. */}
+        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto whitespace-nowrap [scrollbar-width:none]">
+          <span className="mr-2 hidden text-sm font-bold tracking-tight text-slate-900 sm:inline dark:text-slate-50">
             Job Pipeline
           </span>
           {TABS.map((t) => {
@@ -33,7 +37,8 @@ export default function TabNav() {
               <Link
                 key={t.href}
                 href={t.href}
-                className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
+                aria-current={active ? "page" : undefined}
+                className={`shrink-0 rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
                   active
                     ? "bg-indigo-600 text-white shadow-sm"
                     : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
@@ -44,7 +49,7 @@ export default function TabNav() {
             );
           })}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <ProfileSwitcher />
           <ThemeToggle />
         </div>

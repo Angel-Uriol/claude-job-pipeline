@@ -236,3 +236,54 @@ the network or need a key. See [CONTRIBUTING.md](CONTRIBUTING.md).
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+## Compare recommendations and prepare for interviews
+
+**Compare** (also linked from Discover) researches up to five final `apply` or
+`consider` recommendations. It shows salary, benefits and company reviews as
+**below / around / above market / unknown**, with confidence, source links and
+comparison limits. Comparable location, level, currency and pay period matter;
+a saved posting alone cannot establish a market rating. Interview and hiring
+prospects are separate **qualitative signals**, with reasons, barriers and next
+steps — not calibrated probabilities or a conversion of the fit score.
+
+After marking a tracked application **applied**, use its **Interview prep** link
+(or the Interview prep tab). Choose the stage and days available. The report
+includes company/role research, process information to confirm, practice and
+source-backed reported questions, truthful answer outlines, original resume
+bullet evidence, a preparation schedule and questions to ask the interviewer.
+Missing experience stays a gap; suggested practice is never presented as a
+prediction of the actual questions.
+
+Research is on demand, not part of the daily pipeline. It uses the existing
+Claude connection: API web search in API-key mode, or bounded WebSearch/WebFetch
+through the Agent SDK in Claude Code mode. No Chrome extension is needed.
+Each selected job allows at most six searches (and eight page fetches in Code
+mode); the structured analysis is a separate model call. Usage consumes API
+credits or plan capacity, as shown before starting. Candidate identity, resume
+and application notes are excluded from public search queries; profile and
+resume evidence are supplied to Claude only for the subsequent analysis.
+
+Reports are timestamped snapshots saved under `profiles/<slug>/data/research/`.
+They can be reopened from the workspace and refreshed by starting another run.
+They do not overwrite fit scores or tracker history. Live-research failures
+produce explicit warnings and limited-evidence output, or a retryable failure.
+Evidence rules, checked in code (not just asked of the model):
+- Citations must point to sources actually retrieved in that run (or the saved
+  posting) and to your real resume bullets.
+- Sources are labelled **web page** (text was read) or **search listing** (a
+  link and title only — proves the page exists, not what it says). Failed page
+  fetches are dropped and reported.
+- A salary / benefits / reviews rating needs a stated comparison cohort, a cited
+  web page, and a short **exact quote** that really appears in that page's
+  stored text. Otherwise it's shown as *unknown — not verified* with the reason.
+  A saved posting or a search listing alone never sets a market rating.
+- A "reported" interview question needs a readable source; otherwise it's shown
+  as practice. Any figure in an answer outline that isn't in your resume or
+  profile is flagged "check before using".
+This still isn't a guarantee every interpretation is right — read the quotes
+and sources, especially self-selected reviews and interview anecdotes.
+
+Saved reports travel with **profile export/import** (with history): finished
+reports are included and validated on import; running ones are skipped. Tests
+use fictional profiles and mocked research, never live Claude calls.

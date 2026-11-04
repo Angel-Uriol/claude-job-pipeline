@@ -51,6 +51,7 @@ from ..runner import (
 from ..store import JobStore
 from .events import EventBus, PipelineState, event_to_dict
 from .profile_routes import register_profile_routes
+from .research_routes import register_research_routes
 from .setup_routes import register_setup_routes
 
 log = logging.getLogger(__name__)
@@ -213,6 +214,7 @@ def create_app(*, config_path: str | Path | None = None) -> FastAPI:
     register_setup_routes(app)
     # Profiles: one complete memory per person (switch / import / export).
     register_profile_routes(app)
+    register_research_routes(app)
 
     @app.exception_handler(FileNotFoundError)
     async def _not_configured(_request: Request, exc: FileNotFoundError) -> JSONResponse:

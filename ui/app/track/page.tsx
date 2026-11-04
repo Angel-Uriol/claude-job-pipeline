@@ -4,6 +4,8 @@
 
 "use client";
 
+import Link from "next/link";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ApiError, api } from "@/lib/api";
@@ -503,6 +505,9 @@ function TrackCard({
           ))}
         </select>
 
+        {(job.applied_at || ["applied", "recruiter_screen", "phone_screen", "take_home", "onsite", "offer"].includes(job.status)) && (
+          <Link href={`/interview?job=${encodeURIComponent(job.id)}`} className="rounded-md bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300">Interview prep</Link>
+        )}
         {job.url && (
           <a href={job.url} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 hover:underline dark:text-indigo-400" title="Open posting">
             ↗

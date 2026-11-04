@@ -17,7 +17,8 @@ be handed to someone:
       "resume_content": {...},      # profile/resume_content.yaml
       "target_companies": {...},    # profile/target_companies.yaml
       "interview": {...},           # the setup chat (optional)
-      "tracker": {"jobs": [...], "contacts": [...]}   # applied history (optional)
+      "tracker": {"jobs": [...], "contacts": [...]},  # applied history (optional)
+      "research": [...]             # saved comparison / interview-prep reports (optional)
     }
 
 Any OTHER JSON (a resume export, notes about a person, an old context file)
@@ -275,6 +276,12 @@ def export_profile(slug: str, *, include_history: bool = True) -> dict[str, Any]
         bundle["interview"] = json.loads(interview.read_text(encoding="utf-8"))
     if include_history and (d / "config.yaml").exists():
         bundle["tracker"] = tracker_db.export_rows(load_config(d / "config.yaml"))
+    if include_history:
+        from .research.service import export_reports
+
+        reports = export_reports(d)
+        if reports:
+            bundle["research"] = reports
     return bundle
 
 
@@ -328,6 +335,10 @@ def import_bundle(data: dict[str, Any], *, name: str | None = None,
         if config is not None and data.get("tracker"):
             cfg = anchor_paths(Config(**config), d)
             restored = tracker_db.restore_rows(cfg, data["tracker"])
+        if data.get("research"):
+            from .research.service import import_reports
+
+            restored["research"] = import_reports(d, data["research"])
         _write_meta(d, imported_at=datetime.now(UTC).isoformat())
     except Exception:
         shutil.rmtree(d, ignore_errors=True)

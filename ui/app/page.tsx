@@ -13,6 +13,8 @@
 
 "use client";
 
+import Link from "next/link";
+
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -295,6 +297,10 @@ export default function Dashboard() {
           }}
         />
       </div>
+
+      <Link href="/compare" className="mb-4 block rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200">
+        <strong>Compare your recommendations →</strong> Explore salary, benefits, company reviews and your application prospects with cited market research.
+      </Link>
 
       <FilterBar filters={filters} onChange={setFilters} />
 
