@@ -75,6 +75,7 @@ class ChromeQueue:
         extra_notes: str = "",
         profile: str | None = None,
         premium: bool = False,
+        job_urls: list[str] | None = None,
     ) -> dict[str, Any]:
         """Write a new pending request and return its record.
 
@@ -105,6 +106,8 @@ class ChromeQueue:
             "extra_notes": extra_notes,
             "profile": profile,
             "premium": bool(premium),
+            # Specific postings to open and read in full (premium job reads).
+            "job_urls": list(job_urls or []),
             "status": STATUS_PENDING,
             "created_at": _now(),
             "started_at": None,

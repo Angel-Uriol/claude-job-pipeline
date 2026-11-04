@@ -286,7 +286,13 @@ def register_setup_routes(app: FastAPI) -> None:
             if c["name"].lower() in {n.lower() for n in names}:
                 c["premium"] = True
         state.save()
-        return {"queued": record, "watcher_command": WATCHER_COMMAND}
+        from ..premium_advisor import estimate, usage_message
+
+        profile = None if paths.pinned_profile_dir() else paths.active_slug()
+        usage = await asyncio.to_thread(
+            usage_message, estimate([{"kind": "company", "company": n} for n in names], profile)
+        )
+        return {"queued": record, "watcher_command": WATCHER_COMMAND, "usage": usage}
 
     @app.get("/api/setup/preview")
     async def setup_preview() -> dict[str, Any]:

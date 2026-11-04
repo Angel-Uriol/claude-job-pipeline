@@ -675,6 +675,7 @@ function PremiumSearch({
   const [checking, setChecking] = useState(false);
   const [chrome, setChrome] = useState<{ connected: boolean; detail: string } | null>(null);
   const [launched, setLaunched] = useState(false);
+  const [usageText, setUsageText] = useState<string | null>(null);
 
   const toggle = (name: string) =>
     setPicked((p) => (p.includes(name) ? p.filter((x) => x !== name) : [...p, name]));
@@ -685,6 +686,7 @@ function PremiumSearch({
     try {
       const r = await api.setupPremium(picked);
       setQueued(r.watcher_command);
+      setUsageText(r.usage.text);
     } catch (e) {
       onError(errText(e));
     } finally {
@@ -726,6 +728,7 @@ function PremiumSearch({
       {queued ? (
         <div className="mt-3 space-y-3 text-xs text-violet-900 dark:text-violet-100">
           <p>✓ Queued. The app can run it for you — Claude opens and controls Chrome:</p>
+          {usageText && <p className="rounded bg-white/70 px-2 py-1.5 dark:bg-slate-900/60">🔋 {usageText}</p>}
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"

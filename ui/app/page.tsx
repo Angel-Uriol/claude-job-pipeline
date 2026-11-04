@@ -3,6 +3,7 @@
 // Composition:
 //   <CountsHeader />     top-line totals + last-refreshed
 //   <PipelinePanel />    Run daily + per-phase buttons + progress strip
+//   <PremiumSuggestions /> where a ✨ Chrome search would add value, + its cost
 //   <FilterBar />        posted_within, location, min_score, verdict, search
 //   <JobsTable />        the work surface
 //   <JobDrawer />        slide-out detail panel when a row is clicked
@@ -23,6 +24,7 @@ import FilterBar from "@/components/FilterBar";
 import JobDrawer from "@/components/JobDrawer";
 import JobsTable from "@/components/JobsTable";
 import PipelinePanel from "@/components/PipelinePanel";
+import PremiumSuggestions from "@/components/PremiumSuggestions";
 import { ApiError, api, openEventStream } from "@/lib/api";
 import type {
   ChromeClaudeParseResult,
@@ -59,6 +61,8 @@ export default function Dashboard() {
   // Chat box → pre-fill the Run Chrome Claude modal (bump the nonce to open it).
   const [ccPrefill, setCcPrefill] = useState<ChromeClaudeParseResult | null>(null);
   const [ccNonce, setCcNonce] = useState(0);
+  // Bumped when a run finishes so premium suggestions re-evaluate.
+  const [runsDone, setRunsDone] = useState(0);
 
   // --- data loading -------------------------------------------------
 
@@ -144,6 +148,7 @@ export default function Dashboard() {
           setTimeout(() => {
             refreshState();
             refreshJobs();
+            setRunsDone((n) => n + 1);
           }, 500);
         }
       },
@@ -267,6 +272,8 @@ export default function Dashboard() {
         onRun={handleRun}
       />
 
+      <PremiumSuggestions refreshToken={runsDone} onLaunched={() => void refreshState()} />
+
       <div className="mb-4 flex flex-wrap gap-2">
         <BulkResumesButton
           isBusy={state?.pipeline_running !== null && state?.pipeline_running !== undefined}
@@ -313,6 +320,8 @@ export default function Dashboard() {
       </section>
 
       <JobDrawer
+        // Fresh drawer state (e.g. premium-read note) per job.
+        key={selected?.key ?? "none"}
         job={selected}
         onClose={() => setSelected(null)}
         onUpdate={handleJobUpdate}

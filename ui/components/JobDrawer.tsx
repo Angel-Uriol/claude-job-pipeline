@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 
-import { api } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
 import type { Job } from "@/lib/types";
 
 interface Props {
@@ -33,6 +33,8 @@ export default function JobDrawer({
 }: Props) {
   const [busy, setBusy] = useState<"resume" | "apply" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // ✨ premium read of this one posting (Claude in Chrome).
+  const [premiumNote, setPremiumNote] = useState<string | null>(null);
 
   if (!job) return null;
 
@@ -190,7 +192,38 @@ export default function JobDrawer({
             </div>
           )}
 
+          {(job.description?.length ?? 0) < 1200 && !premiumNote && (
+            <p className="rounded-lg bg-fuchsia-50 px-3 py-2 text-xs text-fuchsia-900 dark:bg-fuchsia-500/10 dark:text-fuchsia-200">
+              ✨ This description looks incomplete. A premium read opens the posting in your Chrome
+              and captures the full text, so scoring and resume tailoring see everything.
+            </p>
+          )}
+          {premiumNote && (
+            <p className="rounded-lg bg-fuchsia-50 px-3 py-2 text-xs text-fuchsia-900 dark:bg-fuchsia-500/10 dark:text-fuchsia-200">
+              {premiumNote}
+            </p>
+          )}
+
           <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-3 dark:border-slate-800">
+            <button
+              type="button"
+              onClick={async () => {
+                setError(null);
+                try {
+                  const r = await api.premiumQueue([], [job.key]);
+                  setPremiumNote(
+                    `✓ Queued a premium read. Launch it from the ✨ card on Discover. ${r.usage.text}`,
+                  );
+                } catch (e) {
+                  setError(e instanceof ApiError ? e.detail : (e as Error).message);
+                }
+              }}
+              disabled={busy !== null || premiumNote !== null}
+              title="Claude opens this posting in your Chrome and reads the full description (uses more tokens)."
+              className="rounded-md border border-fuchsia-300 bg-fuchsia-50 px-3 py-2 text-sm font-semibold text-fuchsia-700 transition hover:bg-fuchsia-100 disabled:opacity-50 dark:border-fuchsia-500/30 dark:bg-fuchsia-500/15 dark:text-fuchsia-300"
+            >
+              ✨ Premium read
+            </button>
             <button
               type="button"
               onClick={handleGenerateResume}

@@ -430,3 +430,30 @@ export interface ProfileImportResult extends ProfileSummary {
   mode: "restore" | "smart";
   restored?: { jobs: number; contacts: number };
 }
+
+// ===== premium advisor =====
+
+export interface PremiumRec {
+  kind: "company" | "job";
+  company: string;
+  signal: "no_board" | "dry_board" | "thin_jd" | "visa_unknown";
+  priority: "high" | "medium" | "low";
+  reason: string;
+  job_key?: string;
+  title?: string;
+  url?: string;
+  careers_url?: string;
+}
+
+export interface PremiumUsage {
+  mode: "api_key" | "claude_code";
+  warn: boolean;
+  text: string;
+}
+
+export interface PremiumRecommendations {
+  recommendations: PremiumRec[];
+  estimate: { usd_low: number; usd_high: number; companies: number; jobs: number };
+  usage: PremiumUsage;
+  pending: { id: string; ad_hoc_companies: string[]; job_urls?: string[] }[];
+}

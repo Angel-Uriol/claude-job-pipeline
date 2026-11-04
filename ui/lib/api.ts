@@ -9,6 +9,8 @@
 
 import type {
   AuthCheck,
+  PremiumRecommendations,
+  PremiumUsage,
   ProfileImportResult,
   ProfileSummary,
   ProfilesResponse,
@@ -175,17 +177,24 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ companies }),
     }),
+  premiumRecommendations: () =>
+    request<PremiumRecommendations>("/api/premium/recommendations"),
+  premiumQueue: (companies: string[], jobKeys: string[]) =>
+    request<{ queued: { id: string }; usage: PremiumUsage }>("/api/premium/queue", {
+      method: "POST",
+      body: JSON.stringify({ companies, job_keys: jobKeys }),
+    }),
   chromeCheck: () =>
     request<{ connected: boolean; detail: string }>("/api/chrome-claude/check"),
-  premiumQueue: () =>
+  premiumPending: () =>
     request<{ pending: { id: string; ad_hoc_companies: string[] }[] }>(
       "/api/chrome-claude/premium",
     ),
   setupPremium: (companies: string[]) =>
-    request<{ queued: { id: string }; watcher_command: string }>("/api/setup/premium", {
-      method: "POST",
-      body: JSON.stringify({ companies }),
-    }),
+    request<{ queued: { id: string }; watcher_command: string; usage: PremiumUsage }>(
+      "/api/setup/premium",
+      { method: "POST", body: JSON.stringify({ companies }) },
+    ),
   setupPreview: () => request<{ files: Record<string, string> }>("/api/setup/preview"),
   setupCommit: () =>
     request<{ written: string[]; configured: boolean }>("/api/setup/commit", { method: "POST" }),

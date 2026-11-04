@@ -146,6 +146,13 @@ class TrackerBulkStatusBody(BaseModel):
     status: str
 
 
+class PremiumQueueBody(BaseModel):
+    """Body for POST /api/premium/queue."""
+
+    companies: list[str] = []
+    job_keys: list[str] = []
+
+
 class ChromeNLBody(BaseModel):
     """Free-text body for POST /api/chrome-claude/parse."""
 
@@ -931,6 +938,49 @@ def create_app(*, config_path: str | Path | None = None) -> FastAPI:
         from ..chrome_runner import check_chrome
 
         return await asyncio.to_thread(check_chrome)
+
+    # --- premium advisor: when is a Chrome search worth it? ------------
+
+    @app.get("/api/premium/recommendations")
+    async def premium_recommendations() -> dict[str, Any]:
+        from ..premium_advisor import estimate, recommend, usage_message
+
+        cfg = load_config(config_path)
+        store = JobStore(cfg.paths.jobs_json, excluded_companies=cfg.excluded_companies)
+        store.load()
+        profile = None if paths.pinned_profile_dir() else paths.active_slug()
+        recs = recommend(cfg, store.jobs, profile=profile)
+        est = estimate(recs, profile)
+        usage = await asyncio.to_thread(usage_message, est)
+        return {"recommendations": recs, "estimate": est, "usage": usage,
+                "pending": ChromeQueue().pending_for(profile)}
+
+    @app.post("/api/premium/queue")
+    async def premium_queue(body: PremiumQueueBody) -> dict[str, Any]:
+        """Queue a premium search of chosen companies and/or specific postings."""
+        from ..premium_advisor import estimate, usage_message
+
+        cfg = load_config(config_path)
+        store = JobStore(cfg.paths.jobs_json, excluded_companies=cfg.excluded_companies)
+        store.load()
+        urls: list[str] = []
+        for key in body.job_keys:
+            job = _find_job(store.jobs, key)
+            if job is None:
+                raise HTTPException(404, f"job {key!r} not found")
+            urls.append(job.url)
+        companies = [c.strip() for c in body.companies if c.strip()]
+        if not companies and not urls:
+            raise HTTPException(400, "Pick at least one company or job.")
+        profile = None if paths.pinned_profile_dir() else paths.active_slug()
+        record = ChromeQueue().enqueue(
+            scope="mix", ad_hoc_companies=companies, job_urls=urls, score_after=True,
+            extra_notes="Premium search suggested by the app.", profile=profile, premium=True,
+        )
+        recs = [{"kind": "company", "company": c} for c in companies] + \
+               [{"kind": "job", "company": ""} for _ in urls]
+        usage = await asyncio.to_thread(usage_message, estimate(recs, profile))
+        return {"queued": record, "usage": usage}
 
     @app.get("/api/chrome-claude/premium")
     async def chrome_claude_premium_queue() -> dict[str, Any]:

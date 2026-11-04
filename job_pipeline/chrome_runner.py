@@ -184,7 +184,7 @@ SEARCH_PROMPT = """You are doing a careful job search in the user's Chrome brows
 the candidate below. Search ONLY these companies' own careers sites:
 
 {targets}
-
+{job_reads}
 Candidate profile:
 {profile}
 
@@ -223,18 +223,26 @@ def run_premium(
     s = secrets or load_secrets()
     cli = _require_cli(s)
     names = [*record.get("ad_hoc_companies", []), *record.get("companies", [])]
-    if not names:
-        raise ChromeRunError("This premium search has no companies.")
+    urls = [u for u in record.get("job_urls") or [] if u]
+    if not names and not urls:
+        raise ChromeRunError("This premium search has no companies or postings.")
     notes = record.get("extra_notes") or ""
-    targets = "\n".join(f"- {n}" for n in names)
+    targets = "\n".join(f"- {n}" for n in names) or "- (none — only the postings below)"
+    job_reads = (
+        "\nAlso open each of these specific postings and capture its FULL description "
+        "(include them in `jobs` even if they're already known):\n"
+        + "\n".join(f"- {u}" for u in urls) + "\n"
+    ) if urls else ""
     prompt = SEARCH_PROMPT.format(
         targets=targets,
+        job_reads=job_reads,
         profile=render_prompt("candidate_profile.txt", cfg),
         per_company=cfg.chrome_claude.max_roles_per_company,
         extra=f"- Extra notes from the request: {notes}\n" if notes else "",
     )
     if progress:
-        progress(f"Launching Claude in Chrome for {', '.join(names)}…")
+        what = ", ".join(names) or f"{len(urls)} posting(s)"
+        progress(f"Launching Claude in Chrome for {what}…")
     text, tools, cost = _run(_session(
         prompt, cli=cli, secrets=s, model=cfg.llm.smart_model or DEFAULT_MODEL,
         max_turns=MAX_TURNS, progress=progress,
@@ -249,6 +257,20 @@ def run_premium(
     jobs = [j for j in data.get("jobs") or [] if isinstance(j, dict)]
     return {"jobs": jobs, "notes": str(data.get("notes") or ""), "cost": cost,
             "pages_visited": sum(1 for t in tools if t.endswith("__navigate"))}
+
+
+def _plan_used() -> float | None:
+    from .plan_usage import get_plan_usage
+
+    u = get_plan_usage(fresh=True)
+    window = u.get("five_hour") if u.get("available") else None
+    return float(window["used_pct"]) if window else None
+
+
+def _delta(before: float | None, after: float | None) -> float | None:
+    if before is None or after is None or after < before:
+        return None  # unknown, or the 5-hour window reset mid-run
+    return round(after - before, 1)
 
 
 # --- one-click: run everything queued for this profile -------------------------
@@ -284,6 +306,7 @@ def run_pending_premium(
         if queue.claim(rec["id"]) is None:
             continue
         counts["requests"] += 1
+        before = _plan_used()
         try:
             result = run_premium(rec, cfg, progress=progress)
         except ChromeRunError as e:
@@ -308,6 +331,8 @@ def run_pending_premium(
             "found": len(result["jobs"]), "imported": stats.inserted,
             "already_tracked": stats.already_tracked, "notes": result["notes"],
             "pages_visited": result["pages_visited"], "cost_usd": result["cost"],
+            # How much of the 5-hour plan window this run used (if readable).
+            "plan_pct_used": _delta(before, _plan_used()),
         })
         if progress:
             progress(f"Found {len(result['jobs'])} roles, {stats.inserted} new. "

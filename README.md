@@ -185,6 +185,15 @@ thresholds in config. Jobs at your target companies get a tier bump (+0.3 to +0.
   uses many more tokens. Safety: the session may only use Chrome's browsing tools —
   no shell, no file writes, no forms or uploads — and is told never to log in,
   apply or contact anyone.
+  **The app recommends it for you.** A ✨ suggestions card on Discover (and a
+  "Premium read" button on any job) proposes premium search only where it adds
+  something: companies with no public job board, dream companies whose board
+  returned nothing for you, and strong matches whose description looks cut off
+  (or, if you need sponsorship, doesn't mention it). Before you launch it says
+  what it costs in your terms: on a Claude Code login, your current 5-hour /
+  weekly plan usage (when Claude exposes it) and how much of a session a
+  premium search uses — measured on your own past runs; on an API key, a dollar
+  estimate learned from your past runs.
   *Needs:* Claude Code mode logged in, and the Claude in Chrome extension logged
   into the same account **and attached to Claude Code**. Chrome connects the
   extension to one app at a time, so if you use Claude Desktop: quit it, run
