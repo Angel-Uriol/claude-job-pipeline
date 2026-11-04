@@ -71,8 +71,8 @@ export default function ResearchWorkspace({ kind }: { kind: ResearchKind }) {
     <section className={PANEL}>
       <h2 className="font-semibold">{compare ? "Choose up to five recommendations" : "Choose an application"}</h2>
       {loading ? <p className="mt-3 text-sm" role="status">Loading…</p> : jobs.length === 0 ?
-        <p className="mt-3 text-sm text-slate-500">{compare ? "No apply or consider recommendations yet. Run scoring in Discover first."
-          : "Mark a tracked job as applied to start preparing."} <Link className="text-indigo-600 underline" href={compare ? "/" : "/track"}>{compare ? "Open Discover" : "Open Track"}</Link></p> : <>
+        <p className="mt-3 text-sm text-slate-500">{compare ? "No apply or consider recommendations yet. Run “Find new jobs” on Today first."
+          : "Mark a tracked job as applied to start preparing."} <Link className="text-indigo-600 underline" href={compare ? "/jobs" : "/applications"}>{compare ? "Open Jobs" : "Open Applications"}</Link></p> : <>
         <div className="my-4 max-h-64 space-y-2 overflow-y-auto">
           {jobs.map(job => <label key={job.job_key} className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 text-sm ${selected.includes(job.job_key) ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-500/10" : "border-slate-200 dark:border-slate-700"}`}>
             <input type={compare ? "checkbox" : "radio"} name="research-job" checked={selected.includes(job.job_key)}
@@ -138,6 +138,7 @@ function FindingView({ finding }: { finding: Finding }) {
   return <div className="space-y-2">
     <p className={`font-semibold ${finding.rating === "above market" ? "text-emerald-700 dark:text-emerald-400" : finding.rating === "unknown" ? "text-slate-500" : "text-slate-900 dark:text-slate-100"}`}>{finding.rating} <span className="font-normal text-slate-500">· {finding.confidence} confidence</span></p>
     <p>{finding.explanation}<Refs ids={finding.source_ids} /></p>
+    {finding.rating === "unknown" && <p className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300"><b>Unknown</b> means we couldn&apos;t verify this from public information — it isn&apos;t bad news. Ask the recruiter.</p>}
     {finding.rating !== "unknown" && finding.cohort && <p className="text-xs text-slate-500"><span className="font-semibold">Compared with:</span> {finding.cohort}</p>}
     {finding.rating !== "unknown" && finding.evidence_quote && <blockquote className="border-l-2 border-slate-300 pl-2 text-xs italic text-slate-600 dark:border-slate-600 dark:text-slate-400">“{finding.evidence_quote}”</blockquote>}
   </div>;

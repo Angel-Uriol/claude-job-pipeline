@@ -156,6 +156,9 @@ class Job(BaseModel):
     applied_at: str | None = None  # ISO 8601, set when you apply
     cover_letter_path: str | None = None
     apply_opened_at: str | None = None  # ISO 8601, first click on "Open apply page"
+    # When to nudge the recruiter: ISO 8601, or "done" once handled. Set to
+    # applied + 7 days by "Mark applied"; the tracker DB has its own copy.
+    follow_up_at: str | None = None
     notes: str | None = None
     starred: bool = False  # personal flag, toggled from the UI
 

@@ -1,339 +1,350 @@
-// Dashboard — the only page in v0 of the Next.js UI.
-//
-// Composition:
-//   <CountsHeader />     top-line totals + last-refreshed
-//   <PipelinePanel />    Run daily + per-phase buttons + progress strip
-//   <PremiumSuggestions /> where a ✨ Chrome search would add value, + its cost
-//   <FilterBar />        posted_within, location, min_score, verdict, search
-//   <JobsTable />        the work surface
-//   <JobDrawer />        slide-out detail panel when a row is clicked
-//
-// State lives at this top level so a SSE-driven pipeline finish can
-// trigger a single refetch that updates counts AND the table together.
+// Today — the home page. Answers "what should I do now?" in plain words:
+//   1. one button to find new jobs (runs the daily pipeline, with a progress line)
+//   2. your top new matches, each with why it fits, what's missing, and ONE next step
+//   3. "Waiting on you": follow-ups due, resumes not sent yet, interviews to prep
+// Everything else (filters, every job, pipeline phases) lives on the Jobs page.
+// Data: GET /api/today (job_pipeline/ui/today_routes.py).
 
 "use client";
 
 import Link from "next/link";
-
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-import BulkResumesButton from "@/components/BulkResumesButton";
-import ChromeClaudeButton from "@/components/ChromeClaudeButton";
-import ChromeClaudeChat from "@/components/ChromeClaudeChat";
-import CountsHeader from "@/components/CountsHeader";
-import FilterBar from "@/components/FilterBar";
-import JobDrawer from "@/components/JobDrawer";
-import JobsTable from "@/components/JobsTable";
-import PipelinePanel from "@/components/PipelinePanel";
-import PremiumSuggestions from "@/components/PremiumSuggestions";
+import Checklist from "@/components/Checklist";
+import Explain from "@/components/Explain";
 import { ApiError, api, openEventStream } from "@/lib/api";
-import type {
-  ChromeClaudeParseResult,
-  FilterState,
-  Job,
-  ProgressEvent,
-  StateResponse,
-  Verdict,
-} from "@/lib/types";
+import { scoreTone } from "@/lib/plain";
+import type { TodayMatch, TodayResponse, TodayWaiting } from "@/lib/types";
 
-const DEFAULT_FILTERS: FilterState = {
-  // "all": the first scrape's best matches may be older than two weeks.
-  posted_within: "all",
-  location: "preferred_or_remote",
-  min_score: 70,
-  verdict: new Set<Verdict>(["apply", "consider"]),
-  status: new Set(),
-  source: new Set(),
-  company: null,
-  starred_only: false,
-  show_dismissed: false,
-  q: "",
-  sort: "fit_score:desc",
+const BTN =
+  "rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50";
+const BTN_GHOST =
+  "rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800";
+const CARD =
+  "rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900";
+
+function errText(e: unknown): string {
+  return e instanceof ApiError ? e.detail : (e as Error).message;
+}
+
+// Plain wording for the progress events the daily run streams.
+const PHASE_WORDS: Record<string, string> = {
+  scrape: "Checking company career pages",
+  jsearch: "Searching job boards",
+  "pre-filter": "Removing jobs that don't match your rules",
+  "deep-fit": "Claude is reading and scoring the best ones",
+  digest: "Writing your summary",
+  tracker: "Updating your tracker",
 };
 
-export default function Dashboard() {
-  const [state, setState] = useState<StateResponse | null>(null);
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
-  const [selected, setSelected] = useState<Job | null>(null);
-  const [lastEvent, setLastEvent] = useState<ProgressEvent | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const sseRef = useRef<EventSource | null>(null);
-  // Chat box → pre-fill the Run Chrome Claude modal (bump the nonce to open it).
-  const [ccPrefill, setCcPrefill] = useState<ChromeClaudeParseResult | null>(null);
-  const [ccNonce, setCcNonce] = useState(0);
-  // Bumped when a run finishes so premium suggestions re-evaluate.
-  const [runsDone, setRunsDone] = useState(0);
+export default function TodayPage() {
+  const router = useRouter();
+  const [data, setData] = useState<TodayResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [demo, setDemo] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState<string>("");
+  const [busyKey, setBusyKey] = useState<string | null>(null);
 
-  // --- data loading -------------------------------------------------
-
-  const refreshState = useCallback(async () => {
+  const refresh = useCallback(async () => {
     try {
-      const next = await api.getState();
-      setState(next);
-      setLoadError(null);
+      setData(await api.today());
+      setError(null);
     } catch (e) {
-      const msg =
-        e instanceof ApiError
-          ? `${e.status}: ${e.detail}`
-          : (e as Error).message;
-      setLoadError(
-        `Cannot reach backend at ${process.env.NEXT_PUBLIC_API_BASE ?? "http://127.0.0.1:8765"} — ${msg}`,
-      );
+      setError(errText(e));
     }
   }, []);
 
-  const refreshJobs = useCallback(async () => {
-    try {
-      const resp = await api.getJobs(filters);
-      // Server-side handles min_score / posted_within / location / q /
-      // starred / single-verdict. Multi-verdict needs a client pass:
-      const checked = filters.verdict;
-      let rows =
-        checked.size === 0 || checked.size === 3
-          ? resp.jobs
-          : resp.jobs.filter((j) =>
-              j.fit_verdict ? checked.has(j.fit_verdict) : false,
-            );
-      // Hide jobs you've already dealt with — discarded OR applied — unless
-      // the user opts to show them. Applied jobs live on the Track tab, so
-      // they shouldn't clutter the Discover work surface.
-      if (!filters.show_dismissed) {
-        rows = rows.filter(
-          (j) => j.status !== "dismissed" && j.status !== "applied",
-        );
-      }
-      setJobs(rows);
-      setLoadError(null);
-    } catch (e) {
-      const msg =
-        e instanceof ApiError
-          ? `${e.status}: ${e.detail}`
-          : (e as Error).message;
-      setLoadError(`Job list failed — ${msg}`);
-    }
-  }, [filters]);
-
-  // First run: no profile yet → send the user to the Setup page.
-  const router = useRouter();
+  // First run → Setup. Also learn whether this is the demo profile.
   useEffect(() => {
     api
       .setupStatus()
       .then((s) => {
         if (!s.configured) router.replace("/setup");
       })
-      .catch(() => {
-        /* backend down — the load error banner covers it */
-      });
+      .catch(() => {});
+    api
+      .profiles()
+      .then((r) => setDemo(Boolean(r.profiles.find((p) => p.active)?.demo)))
+      .catch(() => {});
+    api
+      .getTaskStatus()
+      .then((t) => setRunning(t.running !== null))
+      .catch(() => {});
   }, [router]);
 
   useEffect(() => {
-    // Initial + filter-change data load; setState happens after an await.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    refreshJobs();
-  }, [refreshJobs]);
+    refresh();
+  }, [refresh]);
 
+  // Live progress while "Find new jobs" runs.
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    refreshState();
-  }, [refreshState]);
+    const es = openEventStream((evt) => {
+      if (evt.phase === "done" || evt.phase === "error") {
+        setRunning(false);
+        setProgress(evt.phase === "error" ? `Stopped: ${evt.message}` : "Done — here's what's new.");
+        setTimeout(refresh, 500);
+        return;
+      }
+      setRunning(true);
+      const words = PHASE_WORDS[evt.phase] ?? evt.message;
+      const count = evt.total ? ` (${evt.i ?? 0} of ${evt.total})` : "";
+      setProgress(`${words}${count}…`);
+    });
+    return () => es.close();
+  }, [refresh]);
 
-  // --- SSE -----------------------------------------------------------
-
-  useEffect(() => {
-    const es = openEventStream(
-      (evt) => {
-        setLastEvent(evt);
-        // When a run finishes (done / error), refresh everything.
-        if (evt.phase === "done" || evt.phase === "error") {
-          setTimeout(() => {
-            refreshState();
-            refreshJobs();
-            setRunsDone((n) => n + 1);
-          }, 500);
-        }
-      },
-      () => {
-        // EventSource auto-retries; the browser handles backoff.
-        console.warn("SSE connection error; auto-reconnect will retry.");
-      },
-    );
-    sseRef.current = es;
-    return () => {
-      es.close();
-      sseRef.current = null;
-    };
-  }, [refreshState, refreshJobs]);
-
-  // --- actions -------------------------------------------------------
-
-  const handleRun = useCallback(async (phase: string) => {
+  const findJobs = async () => {
+    setProgress("Starting…");
     try {
-      await api.runPhase(phase);
-      // SSE will start sending events; PipelinePanel reads lastEvent.
+      await api.runPhase("daily");
+      setRunning(true);
     } catch (e) {
-      if (e instanceof ApiError && e.status === 409) {
-        alert("A pipeline phase is already running. Wait for it to finish.");
-      } else {
-        alert(`Failed to start ${phase}: ${(e as Error).message}`);
-      }
+      setProgress(e instanceof ApiError && e.status === 409 ? "A search is already running." : errText(e));
     }
-  }, []);
+  };
 
-  const handleJobClick = useCallback((job: Job) => {
-    setSelected(job);
-  }, []);
-
-  const handleStarToggle = useCallback(
-    async (job: Job) => {
-      try {
-        const updated = await api.toggleStar(job.key, !job.starred);
-        setJobs((prev) =>
-          prev.map((j) => (j.key === updated.key ? updated : j)),
-        );
-        if (selected?.key === updated.key) setSelected(updated);
-        refreshState(); // counts include starred.
-      } catch (e) {
-        alert(`Star toggle failed: ${(e as Error).message}`);
+  const act = async (m: TodayMatch) => {
+    const step = m.next_step;
+    if (!step) return;
+    setBusyKey(m.key);
+    try {
+      if (step.id === "resume") {
+        await api.generateResume(m.key);
+      } else if (step.id === "open") {
+        // Open the tab first (synchronously) so pop-up blockers allow it.
+        window.open(m.url, "_blank", "noopener");
+        await api.markOpened(m.key);
+      } else if (step.id === "applied") {
+        await api.markApplied(m.key);
+      } else if (step.id === "follow_up") {
+        await api.followUp({ action: "done", job_key: m.key });
       }
-    },
-    [refreshState, selected],
-  );
+      await refresh();
+    } catch (e) {
+      setError(errText(e));
+    } finally {
+      setBusyKey(null);
+    }
+  };
 
-  const handleJobUpdate = useCallback(
-    (updated: Job) => {
-      setJobs((prev) =>
-        prev.map((j) => (j.key === updated.key ? updated : j)),
-      );
-      setSelected(updated);
-      refreshState();
-    },
-    [refreshState],
-  );
-
-  // Soft-discard: mark dismissed, drop from the visible list (it's hidden
-  // by default), close the drawer if it was open on this job.
-  const handleDismiss = useCallback(
-    async (job: Job) => {
-      try {
-        await api.dismissJob(job.key);
-        setJobs((prev) => prev.filter((j) => j.key !== job.key));
-        setSelected((cur) => (cur?.key === job.key ? null : cur));
-        refreshState();
-      } catch (e) {
-        alert(`Discard failed: ${(e as Error).message}`);
-      }
-    },
-    [refreshState],
-  );
-
-  // Hard-delete: remove from the store entirely (may reappear next scrape
-  // if still live — the drawer's confirm dialog warns about this).
-  const handleDelete = useCallback(
-    async (job: Job) => {
-      try {
-        await api.deleteJob(job.key);
-        setJobs((prev) => prev.filter((j) => j.key !== job.key));
-        setSelected((cur) => (cur?.key === job.key ? null : cur));
-        refreshState();
-      } catch (e) {
-        alert(`Delete failed: ${(e as Error).message}`);
-      }
-    },
-    [refreshState],
-  );
-
-  // --- dead-company set for the table badge --------------------------
-
-  const [deadCompanies, setDeadCompanies] = useState<Set<string>>(new Set());
-  useEffect(() => {
-    api
-      .getCompanies()
-      .then((c) => setDeadCompanies(new Set(c.dead.map((s) => s.toLowerCase()))))
-      .catch(() => {
-        /* non-critical */
-      });
-  }, []);
-
-  const visibleCount = useMemo(() => jobs.length, [jobs]);
+  const today = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
 
   return (
-    <main className="max-w-[1200px] mx-auto px-4 py-6">
-      <CountsHeader state={state} />
-
-      {loadError && (
-        <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
-          {loadError}
+    <main className="mx-auto max-w-[1000px] px-4 py-8">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{today}</p>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-50">Today</h1>
         </div>
+        <div className="text-right">
+          <button
+            type="button"
+            className={BTN}
+            disabled={running || demo}
+            title={demo ? "Switched off in the demo — start your own profile to search for real jobs." : undefined}
+            onClick={findJobs}
+          >
+            {running ? "Searching…" : "Find new jobs"}
+          </button>
+          {progress && (
+            <p role="status" className="mt-2 max-w-xs text-xs text-slate-500 dark:text-slate-400">
+              {progress}
+            </p>
+          )}
+          {data?.budget && <BudgetLine budget={data.budget} />}
+        </div>
+      </header>
+
+      {error && (
+        <p className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">
+          {error}
+        </p>
       )}
 
-      <PipelinePanel
-        running={state?.pipeline_running ?? null}
-        lastEvent={lastEvent}
-        onRun={handleRun}
-      />
-
-      <PremiumSuggestions refreshToken={runsDone} onLaunched={() => void refreshState()} />
-
-      <div className="mb-4 flex flex-wrap gap-2">
-        <BulkResumesButton
-          isBusy={state?.pipeline_running !== null && state?.pipeline_running !== undefined}
-          filters={filters}
-          onStarted={() => refreshState()}
-        />
-        <ChromeClaudeButton
-          prefill={ccPrefill}
-          prefillNonce={ccNonce}
-          onCompleted={() => {
-            refreshState();
-            refreshJobs();
-          }}
-        />
-        <ChromeClaudeChat
-          onParsed={(r) => {
-            setCcPrefill(r);
-            setCcNonce((n) => n + 1);
-          }}
-        />
-      </div>
-
-      <Link href="/compare" className="mb-4 block rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200">
-        <strong>Compare your recommendations →</strong> Explore salary, benefits, company reviews and your application prospects with cited market research.
-      </Link>
-
-      <FilterBar filters={filters} onChange={setFilters} />
-
-      <section>
-        <div className="mb-2 flex items-baseline justify-between">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            Jobs{" "}
-            <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
-              ({visibleCount})
-            </span>
-          </h2>
+      {/* --- top matches --- */}
+      <section className="mt-8">
+        <h2 className="flex items-center text-lg font-semibold text-slate-900 dark:text-slate-100">
+          Your best matches
+          <Explain term="score" />
+        </h2>
+        {data && data.matches.length === 0 && (
+          <div className={`${CARD} mt-3 text-sm text-slate-600 dark:text-slate-300`}>
+            No open matches yet. Click <b>Find new jobs</b> — it checks your target companies and job
+            boards, then Claude scores what it finds. It usually takes a few minutes.
+          </div>
+        )}
+        <div className="mt-3 grid gap-4">
+          {data?.matches.map((m) => (
+            <MatchCard key={m.key} m={m} busy={busyKey === m.key} onAct={() => act(m)} />
+          ))}
         </div>
-
-        <JobsTable
-          jobs={jobs}
-          deadCompanies={deadCompanies}
-          sort={filters.sort}
-          onSortChange={(sort) => setFilters({ ...filters, sort })}
-          onJobClick={handleJobClick}
-          onStarToggle={handleStarToggle}
-          onDiscard={handleDismiss}
-        />
+        {data && data.total_open > data.matches.length && (
+          <p className="mt-3 text-sm">
+            <Link href="/jobs" className="text-indigo-600 underline dark:text-indigo-400">
+              See all {data.total_open} open jobs →
+            </Link>
+          </p>
+        )}
       </section>
 
-      <JobDrawer
-        // Fresh drawer state (e.g. premium-read note) per job.
-        key={selected?.key ?? "none"}
-        job={selected}
-        onClose={() => setSelected(null)}
-        onUpdate={handleJobUpdate}
-        onDismiss={handleDismiss}
-        onDelete={handleDelete}
-      />
+      {/* --- waiting on you --- */}
+      <section className="mt-10">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Waiting on you</h2>
+        {data && data.waiting.length === 0 && (
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Nothing right now. Nice.</p>
+        )}
+        <ul className="mt-3 space-y-2">
+          {data?.waiting.map((w, i) => (
+            <WaitingRow key={`${w.kind}-${w.tracker_id ?? w.job_key ?? i}`} w={w} onChange={refresh} onError={setError} />
+          ))}
+        </ul>
+      </section>
     </main>
+  );
+}
+
+const NEXT_LABEL: Record<string, string> = {
+  resume: "Make my tailored resume",
+  open: "Open the application page",
+  applied: "I applied",
+  follow_up: "I followed up",
+  interview: "Prepare for the interview",
+};
+
+function MatchCard({ m, busy, onAct }: { m: TodayMatch; busy: boolean; onAct: () => void }) {
+  const step = m.next_step;
+  return (
+    <article className={CARD}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${scoreTone(m.score)}`}>{m.label}</span>
+            {m.is_new && (
+              <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-200">
+                New
+              </span>
+            )}
+          </div>
+          <h3 className="mt-2 text-base font-semibold text-slate-900 dark:text-slate-50">{m.title}</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            {m.company} · {m.location}
+          </p>
+        </div>
+        <div className="flex flex-col items-end gap-2">
+          {step ? (
+            step.id === "interview" ? (
+              <Link href="/interview" className={BTN}>
+                {NEXT_LABEL.interview}
+              </Link>
+            ) : (
+              <button type="button" className={BTN} disabled={busy} onClick={onAct}>
+                {busy ? "Working…" : NEXT_LABEL[step.id] ?? step.label}
+              </button>
+            )
+          ) : (
+            <span className="text-sm text-emerald-600">All steps done ✓</span>
+          )}
+          {m.has_resume && (
+            <a className="text-xs text-indigo-600 underline dark:text-indigo-400" href={api.downloadResumeUrl(m.key)}>
+              Download resume (.docx)
+            </a>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Why it fits</p>
+          <ul className="mt-1 space-y-1 text-sm text-slate-700 dark:text-slate-300">
+            {m.reasons.length ? m.reasons.map((r) => <li key={r}>✓ {r}</li>) : <li className="text-slate-400">—</li>}
+          </ul>
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">What&apos;s missing</p>
+          <ul className="mt-1 space-y-1 text-sm text-slate-700 dark:text-slate-300">
+            {m.gaps.length ? m.gaps.map((g) => <li key={g}>△ {g}</li>) : <li className="text-slate-400">No real gaps</li>}
+          </ul>
+        </div>
+      </div>
+
+      <div className="mt-4 border-t border-slate-100 pt-3 dark:border-slate-800">
+        <Checklist steps={m.steps} compact />
+      </div>
+    </article>
+  );
+}
+
+function WaitingRow({ w, onChange, onError }: { w: TodayWaiting; onChange: () => void; onError: (s: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  const target = w.tracker_id ? { tracker_id: w.tracker_id } : { job_key: w.job_key };
+  const run = async (action: "done" | "snooze") => {
+    setBusy(true);
+    try {
+      await api.followUp({ action, days: 3, ...target });
+      onChange();
+    } catch (e) {
+      onError(errText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const icon = w.kind === "follow_up" ? "✉️" : w.kind === "interview" ? "🎤" : "📄";
+  return (
+    <li className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+      <div className="min-w-0 text-sm">
+        <p className="font-medium text-slate-900 dark:text-slate-100">
+          <span aria-hidden>{icon} </span>
+          {w.title} · {w.company}
+          {w.kind === "follow_up" && <Explain term="follow_up" />}
+        </p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">{w.detail}</p>
+      </div>
+      <div className="flex gap-2">
+        {w.kind === "follow_up" && (
+          <>
+            <button type="button" className={BTN_GHOST} disabled={busy} onClick={() => run("done")}>
+              Done
+            </button>
+            <button type="button" className={BTN_GHOST} disabled={busy} onClick={() => run("snooze")}>
+              Remind me in 3 days
+            </button>
+          </>
+        )}
+        {w.kind === "interview" && (
+          <Link href="/interview" className={BTN_GHOST}>
+            Prepare
+          </Link>
+        )}
+        {w.kind === "resume_not_sent" && w.job_key && (
+          <a className={BTN_GHOST} href={api.downloadResumeUrl(w.job_key)}>
+            Download resume
+          </a>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function BudgetLine({ budget }: { budget: NonNullable<TodayResponse["budget"]> }) {
+  const pct = budget.budget_usd > 0 ? Math.min(100, (budget.spent_usd / budget.budget_usd) * 100) : 0;
+  return (
+    <div className="mt-3 w-56 text-left text-xs text-slate-500 dark:text-slate-400">
+      <p>
+        Claude this month: <b>${budget.spent_usd.toFixed(2)}</b>
+        {budget.budget_usd > 0 && <> of ${budget.budget_usd.toFixed(2)}</>}
+        {budget.subscription && " (API-equivalent)"}
+      </p>
+      {budget.budget_usd > 0 && (
+        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+          <div
+            className={`h-full ${pct >= 90 ? "bg-rose-500" : pct >= 70 ? "bg-amber-500" : "bg-emerald-500"}`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      )}
+    </div>
   );
 }

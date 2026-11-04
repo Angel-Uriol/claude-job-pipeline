@@ -1,5 +1,5 @@
-// Track tab — application tracker over the built-in SQLite tracker.
-// Reads/updates via /api/tracker/*. Resume GENERATION lives in Discover;
+// Applications tab (formerly "Track") — application tracker over the built-in SQLite tracker.
+// Reads/updates via /api/tracker/*. Resume GENERATION lives in Jobs;
 // here we only download the tailored resume the handoff carried over.
 
 "use client";
@@ -222,7 +222,7 @@ export default function TrackPage() {
       {!ready ? (
         <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
           The tracker isn&apos;t set up yet. Go to the{" "}
-          <span className="font-semibold">Discover</span> tab and hit{" "}
+          <span className="font-semibold">Jobs</span> tab and hit{" "}
           <span className="font-mono">📨 Send to tracker</span> to populate it.
         </div>
       ) : (

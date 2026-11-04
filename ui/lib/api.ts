@@ -36,6 +36,7 @@ import type {
   TaskStatusResponse,
   TrackerJobsResponse,
   TrackerStats,
+  TodayResponse,
 } from "./types";
 
 /**
@@ -289,6 +290,21 @@ export const api = {
     }),
 
   getTaskStatus: () => request<TaskStatusResponse>("/api/tasks/current"),
+
+  // --- Today screen + apply checklist ---
+  today: () => request<TodayResponse>("/api/today"),
+  /** Record that the apply page was opened (checklist step 3). */
+  markOpened: (key: string) =>
+    request<{ apply_opened_at: string; url: string }>(
+      `/api/jobs/${encodeURIComponent(key)}/opened`,
+      { method: "POST" },
+    ),
+  /** Follow-up nudge: "done" clears it, "snooze" pushes it out N days. */
+  followUp: (body: { action: "done" | "snooze"; days?: number; job_key?: string; tracker_id?: string }) =>
+    request<{ follow_up_at: string | null }>("/api/follow-ups", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 
   getCompanies: () => request<CompaniesResponse>("/api/companies"),
 

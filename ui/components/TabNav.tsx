@@ -1,6 +1,6 @@
-// Global top nav: Discover (the discovery/scoring inbox), Track (the
-// application tracker) and Setup (connect Claude + the profile
-// questionnaire) — plus the profile switcher and the theme toggle.
+// Global top nav in plain words: Today (home: what to do next), Jobs (every
+// scored job), Applications (the tracker), Compare, Interview prep, My info
+// (profile + resume editors) and Setup — plus the profile switcher and theme.
 
 "use client";
 
@@ -11,8 +11,9 @@ import ProfileSwitcher from "./ProfileSwitcher";
 import ThemeToggle from "./ThemeToggle";
 
 const TABS: { href: string; label: string }[] = [
-  { href: "/", label: "Discover" },
-  { href: "/track", label: "Track" },
+  { href: "/", label: "Today" },
+  { href: "/jobs", label: "Jobs" },
+  { href: "/applications", label: "Applications" },
   { href: "/compare", label: "Compare" },
   { href: "/interview", label: "Interview prep" },
   { href: "/setup", label: "Setup" },

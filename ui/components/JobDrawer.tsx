@@ -6,7 +6,9 @@
 
 import { useState } from "react";
 
+import Explain from "@/components/Explain";
 import { ApiError, api } from "@/lib/api";
+import { AXIS_LABELS, VERDICT_LABELS, scoreLabel } from "@/lib/plain";
 import type { Job } from "@/lib/types";
 
 interface Props {
@@ -123,19 +125,32 @@ export default function JobDrawer({
         <div className="space-y-4 p-5 text-sm text-slate-700 dark:text-slate-300">
           {/* Score + verdict + source */}
           <div className="grid grid-cols-3 gap-3">
-            <Stat label="Fit score" value={pct == null ? "—" : `${pct} / 100`} />
-            <Stat label="Verdict" value={job.fit_verdict || "—"} />
+            <Stat label="How well it fits" value={pct == null ? "—" : `${scoreLabel(job.fit_score)} (${pct}/100)`} />
+            <Stat label="Suggestion" value={job.fit_verdict ? VERDICT_LABELS[job.fit_verdict] ?? job.fit_verdict : "—"} />
             <Stat label="Source" value={job.source} />
           </div>
 
+          {!!(job.fit_reasons?.length || job.fit_gaps?.length) && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Section title="Why it fits">
+                <ul className="space-y-1">{(job.fit_reasons ?? []).map((r) => <li key={r}>✓ {r}</li>)}</ul>
+              </Section>
+              <Section title="What's missing">
+                <ul className="space-y-1">
+                  {job.fit_gaps?.length ? job.fit_gaps.map((g) => <li key={g}>△ {g}</li>) : <li>No real gaps</li>}
+                </ul>
+              </Section>
+            </div>
+          )}
+
           {job.fit_justification && (
-            <Section title="Fit justification">
+            <Section title="Claude's reasoning">
               <p className="leading-relaxed">{job.fit_justification}</p>
             </Section>
           )}
 
           {job.honest_bridge_notes && (
-            <Section title="Honest bridge">
+            <Section title="How to talk about the gaps (honestly)">
               <p className="rounded-r border-l-2 border-amber-500 bg-amber-50 px-3 py-2 leading-relaxed text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
                 {job.honest_bridge_notes}
               </p>
@@ -143,15 +158,15 @@ export default function JobDrawer({
           )}
 
           {job.fit_subscores && (
-            <Section title="Sub-scores">
+            <Section title="Score breakdown">
               <div className="space-y-1">
                 {(
                   [
-                    ["stack", "Stack"],
-                    ["level", "Level"],
-                    ["function", "Function"],
-                    ["bridgeability", "Bridge"],
-                    ["desirability", "Desire"],
+                    ["stack", AXIS_LABELS.stack],
+                    ["level", AXIS_LABELS.level],
+                    ["function", AXIS_LABELS.function],
+                    ["bridgeability", AXIS_LABELS.bridgeability],
+                    ["desirability", AXIS_LABELS.desirability],
                   ] as const
                 ).map(([k, label]) => {
                   // Cast via unknown so TS doesn't insist on the index
@@ -161,8 +176,9 @@ export default function JobDrawer({
                   const w = Math.round(v * 10); // 1..10 → 10..100%
                   return (
                     <div key={k} className="flex items-center gap-2">
-                      <span className="w-16 text-xs text-slate-500 dark:text-slate-400">
+                      <span className="flex w-40 items-center text-xs text-slate-500 dark:text-slate-400">
                         {label}
+                        <Explain term={k} />
                       </span>
                       <div className="h-2 flex-1 overflow-hidden rounded bg-slate-200 dark:bg-slate-700">
                         <div
@@ -212,7 +228,7 @@ export default function JobDrawer({
                 try {
                   const r = await api.premiumQueue([], [job.key]);
                   setPremiumNote(
-                    `✓ Queued a premium read. Launch it from the ✨ card on Discover. ${r.usage.text}`,
+                    `✓ Queued a premium read. Launch it from the ✨ card on the Jobs page. ${r.usage.text}`,
                   );
                 } catch (e) {
                   setError(e instanceof ApiError ? e.detail : (e as Error).message);

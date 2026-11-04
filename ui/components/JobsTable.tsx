@@ -4,6 +4,7 @@
 
 "use client";
 
+import { scoreLabel } from "@/lib/plain";
 import { useMemo } from "react";
 
 import { api } from "@/lib/api";
@@ -152,6 +153,7 @@ function Row({
       {/* Score */}
       <span
         className={`rounded px-1.5 py-0.5 text-center text-sm font-semibold tabular-nums ${scoreClass}`}
+        title={`${scoreLabel(job.fit_score)} — fit score out of 100`}
       >
         {pct ?? "—"}
       </span>

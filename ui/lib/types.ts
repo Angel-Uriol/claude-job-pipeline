@@ -162,6 +162,11 @@ export interface Job {
   fit_verdict: Verdict | null;
   fit_justification: string | null;
   fit_subscores: ScoreResult | null;
+  fit_reasons?: string[];         // plain-language "why it fits" (≤3)
+  fit_gaps?: string[];            // plain-language "what's missing" (≤2)
+  cover_letter_path?: string | null;
+  apply_opened_at?: string | null;
+  follow_up_at?: string | null;
   honest_bridge_notes: string | null;
 
   // target-company overlay (your target_companies.yaml)
@@ -457,4 +462,57 @@ export interface PremiumRecommendations {
   estimate: { usd_low: number; usd_high: number; companies: number; jobs: number };
   usage: PremiumUsage;
   pending: { id: string; ad_hoc_companies: string[]; job_urls?: string[] }[];
+}
+
+// ===== Today screen (GET /api/today) =====
+
+export interface ChecklistStep {
+  id: "resume" | "cover_letter" | "open" | "applied" | "follow_up" | "interview";
+  label: string;
+  done: boolean;
+  optional?: boolean;
+  due_at?: string | null;
+  due_now?: boolean;
+}
+
+export interface TodayMatch {
+  key: string;
+  company: string;
+  title: string;
+  location: string;
+  url: string;
+  score: number | null;
+  label: string;
+  reasons: string[];
+  gaps: string[];
+  steps: ChecklistStep[];
+  next_step: ChecklistStep | null;
+  is_new: boolean;
+  has_resume: boolean;
+}
+
+export interface TodayWaiting {
+  kind: "follow_up" | "resume_not_sent" | "interview";
+  company: string;
+  title: string;
+  detail: string;
+  job_key?: string;
+  tracker_id?: string;
+  due_at?: string;
+}
+
+export interface BudgetStatus {
+  spent_usd: number;
+  budget_usd: number;
+  mode: "warn" | "stop";
+  month: string;
+  subscription: boolean;
+}
+
+export interface TodayResponse {
+  matches: TodayMatch[];
+  waiting: TodayWaiting[];
+  total_open: number;
+  applied_count: number;
+  budget: BudgetStatus | null;
 }

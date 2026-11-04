@@ -815,7 +815,7 @@ function PremiumSearch({
               }}
               className="rounded-lg bg-violet-600 px-3 py-1.5 font-semibold text-white transition hover:bg-violet-700 disabled:opacity-40"
             >
-              {launched ? "Running — watch Discover" : "2 · ▶ Launch premium search"}
+              {launched ? "Running — watch Jobs" : "2 · ▶ Launch premium search"}
             </button>
           </div>
           {chrome && (
@@ -826,7 +826,7 @@ function PremiumSearch({
           )}
           {launched && (
             <p>
-              Progress shows on <Link href="/" className="underline">Discover</Link> (“Visiting
+              Progress shows on <Link href="/jobs" className="underline">Jobs</Link> (“Visiting
               careers.…”). Found jobs are imported into this profile and scored automatically.
             </p>
           )}
@@ -922,7 +922,7 @@ function ReviewStep({
         <div className="mt-5 space-y-3">
           <p className="text-sm text-emerald-700 dark:text-emerald-400">✓ Saved {saved.length} files. You&apos;re ready.</p>
           <Link href="/" className={BTN}>
-            Go to Discover and run the pipeline →
+            Go to Today and find jobs →
           </Link>
         </div>
       ) : (

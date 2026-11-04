@@ -32,7 +32,7 @@ export default function CountsHeader({ state }: Props) {
     <header className="mb-6">
       <div className="flex items-baseline gap-3 flex-wrap">
         <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
-          Discover
+          All jobs
         </h1>
         <span className="text-sm text-slate-500 dark:text-slate-400">
           {humanizeAgo(state?.last_refreshed ?? null)}
