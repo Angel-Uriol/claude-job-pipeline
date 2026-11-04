@@ -86,4 +86,12 @@ Do not inflate the numeric scores.
   clearance, score function=0 and bridgeability=0.
 {%- endif %}
 
+# Plain-language summary (for people who aren't technical)
+
+Also fill `fit_reasons` (up to 3) and `gaps` (up to 2): short sentences a
+non-technical reader understands, e.g. "Uses Python and SQL, which you use
+daily" or "Asks for Kubernetes, which you haven't used in production". No
+jargon like "stack axis" or scores. Never claim the candidate has something
+they don't.
+
 Submit your scores via the `submit_fit_score` tool. Do not write a prose answer.

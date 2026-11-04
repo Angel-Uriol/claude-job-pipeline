@@ -1,0 +1,220 @@
+# Demo jobs — ENTIRELY MADE UP (fictional companies, roles and descriptions).
+# Used by "Try a demo first" so people can explore the app before connecting
+# Claude. `days_ago` becomes a real date when the demo is created, so the
+# demo never looks stale. Scores, reasons and gaps are pre-written.
+
+jobs:
+  - company: Northwind Analytics
+    title: Backend Engineer, Data APIs
+    location: San Francisco, CA
+    days_ago: 2
+    fit_score: 8.8
+    verdict: apply
+    target: true
+    subscores: {stack: 9, level: 9, function: 9, bridgeability: 8, desirability: 8}
+    fit_reasons:
+      - "Builds Python and Go services, which is exactly your day-to-day work"
+      - "Mid-to-senior level, matching your ~4 years"
+      - "Kafka ingestion pipelines, like the one you built for 2M events/day"
+    fit_gaps:
+      - "Mentions Terraform, which isn't on your resume"
+    bridge: "Terraform is listed as nice-to-have; say you've used infrastructure-as-code concepts through Kubernetes only if true."
+    description: |
+      Northwind Analytics (fictional) is hiring a Backend Engineer to build the
+      APIs behind our analytics product. You'll design Python and Go services,
+      own Kafka ingestion pipelines and PostgreSQL schemas, and run them on
+      Kubernetes. 3+ years of backend experience. Nice to have: Terraform.
+      Salary: $165,000 - $195,000. Hybrid, San Francisco.
+  - company: Bluepeak Payments
+    title: Software Engineer II, Ledger Platform
+    location: Remote, US
+    days_ago: 4
+    fit_score: 8.2
+    verdict: apply
+    target: true
+    subscores: {stack: 8, level: 9, function: 9, bridgeability: 7, desirability: 7}
+    fit_reasons:
+      - "Payments API work, like your latency improvements on a payments API"
+      - "Fully remote within the US, which fits your location rule"
+      - "Python and PostgreSQL are the core of the role"
+    fit_gaps:
+      - "Prefers Java experience, which you haven't listed"
+    bridge: "Frame Go and Python service work as strongly-typed backend experience; don't claim Java."
+    description: |
+      Bluepeak Payments (fictional) builds ledger infrastructure for small
+      businesses. As a Software Engineer II you'll extend our double-entry
+      ledger service (Python, PostgreSQL), improve API latency and reliability,
+      and participate in a light on-call rotation. Java a plus. Remote (US).
+  - company: Cedarline Health
+    title: Data Platform Engineer
+    location: Oakland, CA
+    days_ago: 1
+    fit_score: 7.6
+    verdict: consider
+    subscores: {stack: 8, level: 8, function: 9, bridgeability: 6, desirability: 6}
+    fit_reasons:
+      - "Data pipelines with Kafka and Postgres match your ingestion work"
+      - "Located in Oakland, inside your Bay Area preference"
+    fit_gaps:
+      - "Needs dbt and Airflow, which you haven't used in production"
+    bridge: "Be upfront that dbt/Airflow are new to you; point to your pipeline design experience."
+    description: |
+      Cedarline Health (fictional) needs a Data Platform Engineer to maintain
+      our event pipelines (Kafka, PostgreSQL) and build batch models in dbt
+      orchestrated by Airflow. HIPAA awareness helpful. Oakland, CA, hybrid.
+  - company: Quanta Logistics
+    title: Senior Backend Engineer
+    location: San Jose, CA
+    days_ago: 6
+    fit_score: 7.1
+    verdict: consider
+    subscores: {stack: 8, level: 6, function: 8, bridgeability: 7, desirability: 6}
+    fit_reasons:
+      - "Go microservices on Kubernetes, which you've migrated 30 services to"
+      - "San Jose is within your Bay Area preference"
+    fit_gaps:
+      - "Asks for 6+ years; you have about 4"
+    bridge: "A stretch on years; lead with the Kubernetes migration scale and ownership."
+    description: |
+      Quanta Logistics (fictional) is hiring a Senior Backend Engineer for our
+      routing platform: Go microservices on Kubernetes, gRPC, PostgreSQL.
+      6+ years of experience preferred. San Jose, CA.
+  - company: Harbor & Pine
+    title: Full-Stack Engineer (Backend-leaning)
+    location: Remote, US
+    days_ago: 3
+    fit_score: 6.9
+    verdict: consider
+    subscores: {stack: 7, level: 8, function: 7, bridgeability: 6, desirability: 6}
+    fit_reasons:
+      - "Backend-heavy full-stack role, one of your 'good fit' roles"
+      - "Remote within the US"
+    fit_gaps:
+      - "Expects strong React; your frontend work is limited to internal tools"
+    bridge: "Say your React experience is internal tooling; emphasize backend depth."
+    description: |
+      Harbor & Pine (fictional) is a small e-commerce team. Build Python
+      backend services and React frontends for merchant tools. Remote (US).
+  - company: Lumenfield AI
+    title: ML Engineer, Inference
+    location: San Francisco, CA
+    days_ago: 5
+    fit_score: 5.6
+    verdict: consider
+    subscores: {stack: 5, level: 7, function: 5, bridgeability: 4, desirability: 8}
+    fit_reasons:
+      - "Serving infrastructure work overlaps your backend and Kubernetes experience"
+    fit_gaps:
+      - "Needs production ML model training, which you list as a gap"
+      - "Asks for PyTorch experience"
+    bridge: "A career-pivot stretch; focus on the serving/infrastructure side honestly."
+    description: |
+      Lumenfield AI (fictional) serves ML models at scale. Optimize inference
+      services, own GPU cluster scheduling on Kubernetes, and work with
+      researchers on PyTorch model deployment. San Francisco.
+  - company: Orchard Cloud
+    title: Platform Engineer
+    location: Seattle, WA
+    days_ago: 2
+    fit_score: 4.4
+    verdict: skip
+    subscores: {stack: 7, level: 7, function: 7, bridgeability: 6, desirability: 5}
+    fit_reasons:
+      - "Kubernetes platform work you've done before"
+    fit_gaps:
+      - "Seattle on-site only, outside your location rule"
+    bridge: ""
+    description: |
+      Orchard Cloud (fictional) Platform Engineer, Seattle on-site.
+      Kubernetes, Terraform, and on-call for our internal developer platform.
+  - company: Saltmarsh Games
+    title: Director of Engineering
+    location: Remote, US
+    days_ago: 8
+    fit_score: 3.1
+    verdict: skip
+    subscores: {stack: 6, level: 0, function: 4, bridgeability: 3, desirability: 6}
+    fit_reasons: []
+    fit_gaps:
+      - "Director-level role; you excluded director titles"
+    bridge: ""
+    description: |
+      Saltmarsh Games (fictional) seeks a Director of Engineering to lead
+      four teams. 10+ years, people management required. Remote.
+  - company: Northwind Analytics
+    title: Software Engineer, Internal Tools
+    location: San Francisco, CA
+    days_ago: 9
+    fit_score: 7.4
+    verdict: consider
+    target: true
+    subscores: {stack: 7, level: 9, function: 7, bridgeability: 7, desirability: 8}
+    fit_reasons:
+      - "Same company as your top match, on the internal tools team"
+      - "Python backend with some React, matching your experience"
+    fit_gaps:
+      - "More frontend than you usually do"
+    bridge: "Mention your internal React tooling, honestly scoped."
+    description: |
+      Northwind Analytics (fictional) internal tools team: Python services and
+      React dashboards for our operations staff. San Francisco, hybrid.
+  - company: Driftwood Energy
+    title: Backend Engineer
+    location: Berkeley, CA
+    days_ago: 11
+    fit_score: 6.4
+    verdict: consider
+    subscores: {stack: 7, level: 7, function: 8, bridgeability: 5, desirability: 5}
+    fit_reasons:
+      - "Python services and PostgreSQL"
+      - "Berkeley is in your preferred area"
+    fit_gaps:
+      - "Wants time-series database experience (TimescaleDB)"
+    bridge: "TimescaleDB is PostgreSQL-based; mention PostgreSQL depth without claiming Timescale."
+    description: |
+      Driftwood Energy (fictional) builds grid-monitoring software. Backend
+      Engineer to build Python APIs over PostgreSQL / TimescaleDB. Berkeley.
+  - company: Bluepeak Payments
+    title: Site Reliability Engineer
+    location: Remote, US
+    days_ago: 7
+    fit_score: 5.2
+    verdict: consider
+    target: true
+    subscores: {stack: 6, level: 8, function: 4, bridgeability: 5, desirability: 7}
+    fit_reasons:
+      - "Kubernetes reliability work you've done"
+    fit_gaps:
+      - "Mostly on-call / pager-heavy, which you listed as a deal-breaker"
+    bridge: "Probably not worth it given your deal-breaker."
+    description: |
+      Bluepeak Payments (fictional) SRE: own on-call for payment systems,
+      incident response, Kubernetes reliability. Heavy pager rotation. Remote.
+  - company: Kestrel Labs
+    title: Backend Engineer (Python)
+    location: Palo Alto, CA
+    days_ago: 1
+    fit_score: 8.0
+    verdict: apply
+    subscores: {stack: 8, level: 8, function: 9, bridgeability: 8, desirability: 7}
+    fit_reasons:
+      - "Python APIs and PostgreSQL, your core skills"
+      - "Palo Alto is in your preferred area"
+      - "Mid-level role, matching your experience"
+    fit_gaps: []
+    bridge: "No real gaps; lead with the 40% latency improvement."
+    description: |
+      Kestrel Labs (fictional) is a 40-person startup building developer
+      analytics. Backend Engineer to own Python APIs, PostgreSQL schema design
+      and background jobs. 3+ years. Palo Alto, hybrid. $160k-$185k.
+
+# Applications already in the tracker (shows follow-ups and interview prep).
+applications:
+  - company: Kestrel Labs
+    role: Backend Engineer (Python) — earlier posting
+    status: applied
+    applied_days_ago: 9
+  - company: Harbor & Pine
+    role: Backend Engineer, Merchant APIs
+    status: phone_screen
+    applied_days_ago: 14

@@ -139,6 +139,9 @@ class Job(BaseModel):
     fit_justification: str | None = None
     fit_subscores: ScoreResult | None = None
     honest_bridge_notes: str | None = None
+    # Plain-language bullets for the Today screen (deep-fit, newer runs only).
+    fit_reasons: list[str] = Field(default_factory=list)
+    fit_gaps: list[str] = Field(default_factory=list)
 
     # Target-company overlay (see target_companies.yaml). Set when the job's
     # company is on the target_companies.yaml list. `target_tier` is 1
@@ -151,6 +154,8 @@ class Job(BaseModel):
     status: Status = Status.NEW
     resume_path: str | None = None
     applied_at: str | None = None  # ISO 8601, set when you apply
+    cover_letter_path: str | None = None
+    apply_opened_at: str | None = None  # ISO 8601, first click on "Open apply page"
     notes: str | None = None
     starred: bool = False  # personal flag, toggled from the UI
 

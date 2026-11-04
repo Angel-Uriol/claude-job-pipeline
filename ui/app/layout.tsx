@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
+import DemoBanner from "@/components/DemoBanner";
 import TabNav from "@/components/TabNav";
 
 export const metadata: Metadata = {
@@ -36,6 +37,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100">
         <TabNav />
+        <DemoBanner />
         {children}
       </body>
     </html>

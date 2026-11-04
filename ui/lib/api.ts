@@ -92,6 +92,7 @@ export const api = {
 
   // ===== Profiles =====
   profiles: () => request<ProfilesResponse>("/api/profiles"),
+  createDemo: () => request<ProfileSummary>("/api/profiles/demo", { method: "POST" }),
   createProfile: (name: string) =>
     request<ProfileSummary>("/api/profiles", { method: "POST", body: JSON.stringify({ name }) }),
   activateProfile: (slug: string) =>

@@ -64,6 +64,9 @@ class DeepFitResult(BaseModel):
     scores: DeepFitScores
     justification: str = Field(max_length=4000)
     honest_bridge_notes: str | None = Field(default=None, max_length=4000)
+    # Short, plain-language bullets for non-technical readers (Today screen).
+    fit_reasons: list[str] = Field(default_factory=list)
+    gaps: list[str] = Field(default_factory=list)
 
 
 # --- LLM client interface ------------------------------------------------
@@ -94,6 +97,14 @@ class _RawDeepFitResponse(BaseModel):
     scores: _RawDeepFitScores
     justification: str
     honest_bridge_notes: str | None = None
+    fit_reasons: list[str] = Field(
+        default_factory=list,
+        description="Up to 3 short plain-English reasons this job fits the candidate.",
+    )
+    gaps: list[str] = Field(
+        default_factory=list,
+        description="Up to 2 short plain-English things the candidate is missing (or []).",
+    )
 
 
 def _clamp_unit_score(x: float) -> float:
@@ -129,6 +140,8 @@ class ClaudeDeepFitClient:
             scores=scores,
             justification=parsed.justification[:4000],
             honest_bridge_notes=(notes[:4000] if notes else None),
+            fit_reasons=[r.strip()[:200] for r in parsed.fit_reasons if r.strip()][:3],
+            gaps=[g.strip()[:200] for g in parsed.gaps if g.strip()][:2],
         )
 
 

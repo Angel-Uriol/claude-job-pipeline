@@ -26,6 +26,22 @@ Everything stays on your computer. Claude only sees what each step needs.
 
 ## Quick start
 
+### The easy way (no terminal)
+
+1. On GitHub, click **Code → Download ZIP**, then unzip it anywhere.
+2. Double-click **Start.command** (Mac) or **Start.bat** (Windows).
+   - **Mac, first time only:** macOS blocks files downloaded from the internet. Right-click
+     `Start.command` → **Open** → **Open**. After that a normal double-click works.
+   - **Windows:** if SmartScreen appears, click **More info → Run anyway**.
+3. The first start installs everything it needs into the folder (a few minutes). Later
+   starts take seconds. Your browser opens at **http://localhost:8766**.
+4. Leave the small window open while you use the app; close it to stop.
+
+Want to look around first? On the Setup page click **Try the demo** — it loads made-up
+jobs so you can explore before creating an API key.
+
+### For developers
+
 You need **Python 3.11+**, **Node 20+** and **[uv](https://docs.astral.sh/uv/)**.
 
 ```bash

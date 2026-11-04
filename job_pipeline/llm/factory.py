@@ -7,6 +7,19 @@ from typing import Any
 from ..config import Secrets, load_secrets
 from .base import ClaudeClient, LLMError
 
+DEMO_MESSAGE = (
+    "This is the demo profile with made-up data, so Claude features are turned off. "
+    "Start your own profile to use them."
+)
+
+
+def _refuse_in_demo() -> None:
+    """The demo shows what the app does without spending anyone's credits."""
+    from ..demo import is_demo
+
+    if is_demo():
+        raise LLMError(DEMO_MESSAGE)
+
 
 def build_llm(secrets: Secrets | None = None) -> ClaudeClient:
     """Return a client for the configured auth mode.
@@ -15,6 +28,7 @@ def build_llm(secrets: Secrets | None = None) -> ClaudeClient:
     (no API key, Claude Code CLI not installed, ...).
     """
     s = secrets or load_secrets()
+    _refuse_in_demo()
     if s.auth_mode == "claude_code":
         from .cli_client import ClaudeCodeClient
 

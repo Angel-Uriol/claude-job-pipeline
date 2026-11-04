@@ -701,6 +701,8 @@ def run_deep_fit(
         job.fit_subscores = ScoreResult(**result.scores.model_dump())
         job.fit_justification = result.justification
         job.honest_bridge_notes = result.honest_bridge_notes
+        job.fit_reasons = result.fit_reasons
+        job.fit_gaps = result.gaps
         counts[verdict.value] += 1
 
     return counts

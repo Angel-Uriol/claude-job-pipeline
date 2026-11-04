@@ -129,6 +129,7 @@ def _summary(d: Path, active: str) -> dict[str, Any]:
         "tracked_jobs": tracked,
         "applied": applied,
         "created_at": meta.get("created_at"),
+        "demo": bool(meta.get("demo")),
     }
 
 

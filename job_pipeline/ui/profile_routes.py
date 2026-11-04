@@ -57,6 +57,14 @@ def register_profile_routes(app: FastAPI) -> None:
         _not_running()
         return _guard(profiles.create, body.name)
 
+    @app.post("/api/profiles/demo")
+    async def create_demo_profile() -> dict[str, Any]:
+        """Made-up demo data so people can explore before setting anything up."""
+        from ..demo import create_demo
+
+        _not_running()
+        return await asyncio.to_thread(_guard, create_demo)
+
     @app.post("/api/profiles/{slug}/activate")
     async def activate_profile(slug: str) -> dict[str, Any]:
         _not_running()

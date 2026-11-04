@@ -80,7 +80,9 @@ SCHEMA: list[str] = [
         status            TEXT DEFAULT 'new',
         notes             TEXT,
         applied_at        TEXT,
-        added_at          TEXT DEFAULT (datetime('now'))
+        added_at          TEXT DEFAULT (datetime('now')),
+        follow_up_at      TEXT,   -- when to nudge the recruiter (applied + 7 days)
+        cover_letter_path TEXT
     )
     """,
     """
@@ -137,14 +139,19 @@ INDEXES: list[str] = [
 # (table, column, ALTER statement). Run before the indexes.
 MIGRATIONS: list[tuple[str, str, str]] = [
     ("jobs", "hidden", "ALTER TABLE jobs ADD COLUMN hidden INTEGER DEFAULT 0"),
+    ("jobs", "follow_up_at", "ALTER TABLE jobs ADD COLUMN follow_up_at TEXT"),
+    ("jobs", "cover_letter_path", "ALTER TABLE jobs ADD COLUMN cover_letter_path TEXT"),
 ]
+
+FOLLOW_UP_DAYS = 7
 
 # Columns `insert_jobs` writes (id + batch are filled in by the importer).
 INSERT_COLUMNS = (
     "id batch company role role_tier role_category job_id location location_pass "
     "posted level salary h1b url fit_score stack_score level_score function_score "
     "bridgeability desirability verdict bridge_notes key_requirements "
-    "key_nice_to_haves full_jd_text starred status notes applied_at"
+    "key_nice_to_haves full_jd_text starred status notes applied_at cover_letter_path "
+    "follow_up_at"
 ).split()
 
 
@@ -345,13 +352,15 @@ def stats(cfg: Config) -> dict[str, Any]:
 
 
 def set_status(cfg: Config, job_id: str, status: str) -> bool:
-    """Update a job's status; auto-stamp applied_at on first →applied."""
+    """Update a job's status; auto-stamp applied_at on first →applied, and
+    schedule a follow-up nudge FOLLOW_UP_DAYS later (unless one is set)."""
     if status not in VALID_STATUSES:
         raise ValueError(f"invalid status {status!r}")
     conn = _open(cfg)
     try:
         applied = (
-            ", applied_at = COALESCE(applied_at, datetime('now'))"
+            ", applied_at = COALESCE(applied_at, datetime('now')), "
+            f"follow_up_at = COALESCE(follow_up_at, datetime('now', '+{FOLLOW_UP_DAYS} days'))"
             if status == "applied"
             else ""
         )
@@ -513,8 +522,22 @@ def _row(j: dict[str, Any], batch: int, jid: str) -> tuple[Any, ...]:
         j.get("bridge_notes"), json.dumps(j.get("key_requirements") or []),
         json.dumps(j.get("key_nice_to_haves") or []), j.get("full_jd_text"),
         1 if j.get("starred") else 0, j.get("status") or "new",
-        j.get("notes") or "", j.get("applied_at"),
+        j.get("notes") or "", j.get("applied_at"), j.get("cover_letter_path"),
+        j.get("follow_up_at") or _default_follow_up(j.get("status"), j.get("applied_at")),
     )
+
+
+def _default_follow_up(status: Any, applied_at: Any) -> str | None:
+    """Applied jobs get a follow-up nudge FOLLOW_UP_DAYS after applying."""
+    if status != "applied":
+        return None
+    try:
+        base = datetime.fromisoformat(str(applied_at)) if applied_at else datetime.now()
+    except ValueError:
+        base = datetime.now()
+    from datetime import timedelta
+
+    return (base + timedelta(days=FOLLOW_UP_DAYS)).isoformat()
 
 
 def _register_resume(
@@ -649,3 +672,24 @@ def restore_rows(cfg: Config, data: dict[str, list[dict[str, Any]]]) -> dict[str
     finally:
         conn.close()
     return counts
+
+
+def set_follow_up(cfg: Config, job_id: str, when: str | None) -> bool:
+    """Set (ISO date-time), snooze, or clear (None = done) a follow-up nudge."""
+    conn = _open(cfg)
+    try:
+        cur = conn.execute("UPDATE jobs SET follow_up_at = ? WHERE id = ?", (when, job_id))
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
+
+
+def set_cover_letter(cfg: Config, job_id: str, path: str) -> bool:
+    conn = _open(cfg)
+    try:
+        cur = conn.execute("UPDATE jobs SET cover_letter_path = ? WHERE id = ?", (path, job_id))
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()

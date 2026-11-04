@@ -418,6 +418,7 @@ export interface ProfileSummary {
   tracked_jobs: number;
   applied: number;
   created_at: string | null;
+  demo?: boolean;
 }
 
 export interface ProfilesResponse {

@@ -100,6 +100,7 @@ def _map_job(job: Job, cfg: Config | None = None) -> dict[str, Any]:
         "applied_at": job.applied_at,
         "starred": job.starred,
         "resume_path": job.resume_path,
+        "cover_letter_path": job.cover_letter_path,
         # Discover doesn't extract these structured lists.
         "key_requirements": [],
         "key_nice_to_haves": [],

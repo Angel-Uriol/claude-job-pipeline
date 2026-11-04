@@ -263,6 +263,41 @@ function InstallStep({
   );
 }
 
+// "Try a demo first": explore with made-up data before any setup.
+function DemoOffer() {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  return (
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-indigo-300 bg-indigo-50/60 p-4 dark:border-indigo-500/30 dark:bg-indigo-500/10">
+      <div className="text-sm">
+        <p className="font-semibold text-indigo-900 dark:text-indigo-100">Not ready to set up? Try a demo first.</p>
+        <p className="text-xs text-indigo-900/70 dark:text-indigo-100/70">
+          Explore scored jobs, the application checklist and resumes using made-up data. No account or key needed.
+        </p>
+      </div>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          setErr(null);
+          try {
+            await api.createDemo();
+            window.location.assign("/");
+          } catch (e) {
+            setErr(errText(e));
+            setBusy(false);
+          }
+        }}
+        className={BTN_GHOST}
+      >
+        {busy ? "Preparing demo…" : "Try the demo"}
+      </button>
+      {err && <p className="w-full text-xs text-rose-600">{err}</p>}
+    </div>
+  );
+}
+
 // ===== step 1: connect Claude =====
 
 function AuthStep({
@@ -308,22 +343,31 @@ function AuthStep({
         Claude writes the questionnaire, scores every job against your profile, and tailors your resume.
       </p>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <label className={`cursor-pointer rounded-xl border p-4 ${mode === "api_key" ? "border-indigo-500 ring-2 ring-indigo-200 dark:ring-indigo-500/30" : "border-slate-200 dark:border-slate-700"}`}>
-          <input type="radio" className="sr-only" checked={mode === "api_key"} onChange={() => setMode("api_key")} />
-          <div className="text-sm font-semibold">Anthropic API key <span className="ml-1 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">recommended</span></div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            Pay-as-you-go. A typical daily run costs cents. Create a key at console.anthropic.com.
-          </p>
-        </label>
-        <label className={`cursor-pointer rounded-xl border p-4 ${mode === "claude_code" ? "border-indigo-500 ring-2 ring-indigo-200 dark:ring-indigo-500/30" : "border-slate-200 dark:border-slate-700"}`}>
-          <input type="radio" className="sr-only" checked={mode === "claude_code"} onChange={() => setMode("claude_code")} />
-          <div className="text-sm font-semibold">My Claude Code login</div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            Uses the Claude Code CLI already logged in on this computer — no key to paste.
-          </p>
-        </label>
-      </div>
+      <DemoOffer />
+
+      {mode === "api_key" ? (
+        <ol className="mt-4 space-y-3 text-sm">
+          {[
+            <>Create a free account on the <a className="text-indigo-600 underline" href="https://console.anthropic.com/" target="_blank" rel="noreferrer">Anthropic Console</a> (Anthropic makes Claude).</>,
+            <>Add a payment method under <b>Billing</b>. You pay only for what you use — a daily job search usually costs a few cents.</>,
+            <>Set a <b>monthly spending limit</b> under <a className="text-indigo-600 underline" href="https://console.anthropic.com/settings/limits" target="_blank" rel="noreferrer">Limits</a> (for example $10). It&apos;s a safety net: Claude simply stops at that amount.</>,
+            <>Open <a className="text-indigo-600 underline" href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer">API keys</a>, click <b>Create key</b>, and copy it (it starts with <code>sk-ant-</code>).</>,
+            <>Paste it below and click <b>Save &amp; test connection</b>.</>,
+          ].map((text, i) => (
+            <li key={i} className="flex gap-3">
+              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-indigo-600 text-xs font-bold text-white">{i + 1}</span>
+              <span className="pt-0.5 text-slate-700 dark:text-slate-300">{text}</span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="mt-4 rounded-lg bg-slate-100 px-3 py-2 text-sm dark:bg-slate-800">
+          Using your Claude Code login (advanced).{" "}
+          <button type="button" className="text-indigo-600 underline" onClick={() => setMode("api_key")}>
+            Use an API key instead
+          </button>
+        </p>
+      )}
 
       {mode === "api_key" ? (
         <div className="mt-4">
@@ -340,6 +384,17 @@ function AuthStep({
             className={`mt-1 ${INPUT}`}
           />
           <p className="mt-1 text-xs text-slate-400">Saved only to <code>.env</code> in this folder (never committed).</p>
+          <details className="mt-4 text-sm">
+            <summary className="cursor-pointer text-slate-500">Advanced: use my Claude subscription (Claude Code) instead</summary>
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+              For people who already use Claude Code on this computer. It needs the Claude Code
+              command-line tool, and premium Chrome searches need extra setup. If that sounds
+              unfamiliar, stick with an API key.
+            </p>
+            <button type="button" className={`mt-2 ${BTN_GHOST}`} onClick={() => setMode("claude_code")}>
+              Switch to Claude Code login
+            </button>
+          </details>
         </div>
       ) : (
         <div className="mt-4 space-y-2 text-sm text-slate-600 dark:text-slate-300">
