@@ -29,6 +29,9 @@ def build_llm(secrets: Secrets | None = None) -> ClaudeClient:
     """
     s = secrets or load_secrets()
     _refuse_in_demo()
+    from .budget import check
+
+    check(s)  # monthly budget in "stop" mode
     if s.auth_mode == "claude_code":
         from .cli_client import ClaudeCodeClient
 

@@ -58,6 +58,10 @@ class Secrets(BaseSettings):
         default="api_key", alias="JOB_PIPELINE_AUTH_MODE"
     )
     anthropic_api_key: str = Field(default="", alias="ANTHROPIC_API_KEY")
+    # Monthly Claude spending budget in USD (0 = no budget) and what happens
+    # when it's reached: "warn" (keep going, show a warning) or "stop".
+    monthly_budget: float = Field(default=0.0, alias="JOB_PIPELINE_MONTHLY_BUDGET")
+    budget_mode: Literal["warn", "stop"] = Field(default="warn", alias="JOB_PIPELINE_BUDGET_MODE")
     # Optional path to the `claude` binary (claude_code mode only).
     claude_cli_path: str = Field(default="", alias="CLAUDE_CLI_PATH")
     # Optional long-lived token from `claude setup-token` (claude_code mode

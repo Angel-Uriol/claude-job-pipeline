@@ -26,6 +26,7 @@ Two details borrowed from a pattern that is known to work:
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import json
 import logging
 import os
@@ -185,6 +186,9 @@ class ClaudeCodeClient:
                 if isinstance(msg, AssistantMessage):
                     parts.extend(b.text for b in msg.content if isinstance(b, TextBlock))
                 elif isinstance(msg, ResultMessage):
+                    from .usage import record_cli_result
+
+                    record_cli_result(model, msg)
                     is_error = bool(msg.is_error)
                     result = msg.result or result
                     if getattr(msg, "api_error_status", None) or getattr(msg, "errors", None):
@@ -203,7 +207,9 @@ class ClaudeCodeClient:
         return text
 
     def _run(self, prompt: str, model: str, system: str | None) -> str:
-        future = _EXECUTOR.submit(asyncio.run, self._run_async(prompt, model, system))
+        # copy_context: keep the usage_feature tag inside the worker thread.
+        ctx = contextvars.copy_context()
+        future = _EXECUTOR.submit(ctx.run, asyncio.run, self._run_async(prompt, model, system))
         return future.result()
 
     # -- ClaudeClient ------------------------------------------------------

@@ -38,6 +38,7 @@ from pydantic import BaseModel, Field
 
 from .. import paths
 from ..llm import ClaudeClient
+from ..llm.usage import tagged
 from ..resume.skills import SOFT_SKILLS
 
 # How many past messages Claude sees each turn (the draft carries the rest).
@@ -495,6 +496,7 @@ def _wants_upload(text: str) -> bool:
     return bool(re.search(r"\b(yes|yeah|yep|sure|upload|have)\b", t))
 
 
+@tagged("setup-chat")
 def _ask(state: InterviewState, *, llm: ClaudeClient, model: str) -> InterviewTurn:
     turn = llm.structured(
         _turn_prompt(state),

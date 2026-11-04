@@ -17,6 +17,7 @@ from .. import tracker_db
 from ..config import Config
 from ..llm import ClaudeClient, LLMError
 from ..llm.research import WebEvidence, safe_url, web_research
+from ..llm.usage import tagged
 from ..paths import PROMPTS_DIR
 from ..prompts import candidate_block
 from ..resume.content_loader import load_resume_content
@@ -122,6 +123,7 @@ def list_reports(profile_dir: Path) -> list[dict[str, Any]]:
     return sorted(reports, key=lambda r: str(r.get("created_at") or ""), reverse=True)
 
 
+@tagged("research")
 def build_report(
     cfg: Config, profile_dir: Path, request: ResearchRequest,
     jobs: list[dict[str, Any]], client: ClaudeClient,

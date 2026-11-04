@@ -36,6 +36,7 @@ from .applied_guard import load_tracked_index, sync_statuses
 from .config import Config, Secrets
 from .digest import build_chrome_prompts_for_config, build_digest_html
 from .llm import ClaudeClient, build_llm
+from .llm.usage import tagged
 from .models import Job, PreFilterVerdict, ScoreResult, Source, Status
 from .prompts import render_prompt_file
 from .scoring import (
@@ -493,6 +494,7 @@ def run_jsearch(
 # --- pre-filter ---------------------------------------------------------
 
 
+@tagged("pre-filter")
 def run_pre_filter(
     cfg: Config,
     secrets: Secrets,
@@ -609,6 +611,7 @@ def _cap_targets(
 # --- deep-fit -----------------------------------------------------------
 
 
+@tagged("scoring")
 def run_deep_fit(
     cfg: Config,
     secrets: Secrets,
@@ -816,6 +819,7 @@ def _job_select_key(j: Job) -> str:
     return j.job_id or j.dedup_key()[1]
 
 
+@tagged("resumes")
 def run_resumes_batch(
     cfg: Config,
     store: JobStore,

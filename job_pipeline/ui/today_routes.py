@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .. import paths, tracker_db
 from ..checklist import (
@@ -25,11 +25,17 @@ from ..checklist import (
     score_label,
 )
 from ..config import Config, load_config
+from ..llm.budget import status as budget_status
 from ..models import Job, Status, Verdict
 from ..store import JobStore
 
 TOP_MATCHES = 5
 OPEN_STATUSES = (Status.NEW, Status.PENDING, Status.RESUME_ONLY)
+
+
+class BudgetBody(BaseModel):
+    monthly_usd: float = Field(ge=0, le=10_000)  # 0 = no budget
+    mode: Literal["warn", "stop"] = "warn"
 
 
 class FollowUpBody(BaseModel):
@@ -151,8 +157,20 @@ def register_today_routes(app: FastAPI) -> None:
     @app.get("/api/today")
     async def today() -> dict[str, Any]:
         data = build_today(load_config(config_file()))
-        data["budget"] = None  # filled in by the usage ledger (llm/budget.py)
+        data["budget"] = budget_status()
         return data
+
+    @app.get("/api/budget")
+    async def get_budget() -> dict[str, Any]:
+        return budget_status()
+
+    @app.put("/api/budget")
+    async def put_budget(body: BudgetBody) -> dict[str, Any]:
+        from ..onboarding.env_file import set_env_values
+
+        set_env_values({"JOB_PIPELINE_MONTHLY_BUDGET": f"{body.monthly_usd:g}",
+                        "JOB_PIPELINE_BUDGET_MODE": body.mode})
+        return budget_status()
 
     @app.post("/api/jobs/{job_key}/opened")
     async def opened(job_key: str) -> dict[str, Any]:

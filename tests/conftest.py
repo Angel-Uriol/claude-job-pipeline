@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import sqlite3
+import tempfile
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -20,6 +21,9 @@ EXAMPLE_CONFIG = EXAMPLE_PROFILE / "config.yaml"
 os.environ["JOB_PIPELINE_PROFILE_DIR"] = str(EXAMPLE_PROFILE)
 # Never let a developer's real key or auth mode leak into tests.
 os.environ["JOB_PIPELINE_AUTH_MODE"] = "api_key"
+# Tests never write the real usage ledger (data/usage.jsonl).
+os.environ["JOB_PIPELINE_USAGE_FILE"] = str(
+    Path(tempfile.mkdtemp(prefix="jp-usage-")) / "usage.jsonl")
 os.environ["ANTHROPIC_API_KEY"] = ""
 
 from job_pipeline import paths  # noqa: E402

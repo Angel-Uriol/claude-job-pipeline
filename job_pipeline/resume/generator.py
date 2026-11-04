@@ -24,6 +24,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from ..llm.usage import tagged
 from ..models import Job
 from .content_loader import ResumeContent
 from .families import FamilyConfig, classify_family
@@ -44,6 +45,7 @@ class ResumeGenerationError(Exception):
     """Raised on any failure during resume generation."""
 
 
+@tagged("resume")
 def generate_resume(
     job: Job,
     content: ResumeContent,

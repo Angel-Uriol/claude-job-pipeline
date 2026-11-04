@@ -510,6 +510,16 @@ export interface BudgetStatus {
   mode: "warn" | "stop";
   month: string;
   subscription: boolean;
+  over?: boolean;
+  remaining_usd?: number | null;
+  by_feature?: Record<string, number>;
+}
+
+export interface PrivacyInventory {
+  profiles: { name: string; slug: string }[];
+  folders: { path: string; exists: boolean; bytes: number }[];
+  keys: string[];
+  pinned: boolean;
 }
 
 export interface TodayResponse {

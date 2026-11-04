@@ -37,6 +37,8 @@ import type {
   TrackerJobsResponse,
   TrackerStats,
   TodayResponse,
+  BudgetStatus,
+  PrivacyInventory,
   CoverLetterResult,
   ResumeChanges,
   PrintSpec,
@@ -293,6 +295,17 @@ export const api = {
     }),
 
   getTaskStatus: () => request<TaskStatusResponse>("/api/tasks/current"),
+
+  // --- spending + privacy ---
+  budget: () => request<BudgetStatus>("/api/budget"),
+  setBudget: (monthly_usd: number, mode: "warn" | "stop") =>
+    request<BudgetStatus>("/api/budget", { method: "PUT", body: JSON.stringify({ monthly_usd, mode }) }),
+  privacy: () => request<PrivacyInventory>("/api/privacy"),
+  deleteAll: (confirm: string) =>
+    request<{ removed: string[]; keys_cleared: string[] }>("/api/privacy/delete-all", {
+      method: "POST",
+      body: JSON.stringify({ confirm }),
+    }),
 
   // --- in-app editors (no YAML) ---
   getProfileInfo: () => request<{ profile: Record<string, unknown> }>("/api/profile"),

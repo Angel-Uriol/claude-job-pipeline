@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 
 from ..config import Config
 from ..llm.base import ClaudeClient, LLMError
+from ..llm.usage import tagged
 from ..models import Job
 from ..research.service import candidate_evidence, unbacked_figures, validate_references
 from .content_loader import ResumeContent
@@ -69,6 +70,7 @@ def check_letter(letter: CoverLetter, evidence: dict[str, str], cfg: Config) -> 
     return [f'"{f}" isn\'t on your resume — check it before sending.' for f in figures]
 
 
+@tagged("cover-letter")
 def generate_cover_letter(
     job: Job,
     content: ResumeContent,

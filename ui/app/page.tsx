@@ -336,6 +336,10 @@ function BudgetLine({ budget }: { budget: NonNullable<TodayResponse["budget"]> }
         Claude this month: <b>${budget.spent_usd.toFixed(2)}</b>
         {budget.budget_usd > 0 && <> of ${budget.budget_usd.toFixed(2)}</>}
         {budget.subscription && " (API-equivalent)"}
+        {" · "}
+        <Link href="/privacy" className="underline">
+          {budget.budget_usd > 0 ? "Budget" : "Set a budget"}
+        </Link>
       </p>
       {budget.budget_usd > 0 && (
         <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">

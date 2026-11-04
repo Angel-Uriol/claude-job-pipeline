@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
+import Link from "next/link";
+
 import DemoBanner from "@/components/DemoBanner";
 import TabNav from "@/components/TabNav";
 
@@ -39,6 +41,12 @@ export default function RootLayout({
         <TabNav />
         <DemoBanner />
         {children}
+        <footer data-noprint className="mt-auto border-t border-slate-200 px-4 py-4 text-center text-xs text-slate-500 print:hidden dark:border-slate-800">
+          Runs only on your computer ·{" "}
+          <Link href="/privacy" className="underline">Privacy &amp; spending</Link>
+          {" · "}
+          <Link href="/profiles" className="underline">Profiles</Link>
+        </footer>
       </body>
     </html>
   );

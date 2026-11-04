@@ -51,7 +51,11 @@ class AnthropicAPIClient:
         delay = 2.0
         for attempt in range(1, self._max_attempts + 1):
             try:
-                return self._client.messages.create(**kwargs)
+                response = self._client.messages.create(**kwargs)
+                from .usage import record_api_response
+
+                record_api_response(str(kwargs.get("model", "")), response)
+                return response
             except _RETRYABLE as e:
                 if attempt == self._max_attempts:
                     raise LLMError(f"Claude API unavailable after {attempt} attempts: {e}") from e

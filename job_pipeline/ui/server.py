@@ -52,6 +52,7 @@ from ..store import JobStore
 from .document_routes import register_document_routes
 from .edit_routes import register_edit_routes
 from .events import EventBus, PipelineState, event_to_dict
+from .privacy_routes import register_privacy_routes
 from .profile_routes import register_profile_routes
 from .research_routes import register_research_routes
 from .setup_routes import register_setup_routes
@@ -224,6 +225,8 @@ def create_app(*, config_path: str | Path | None = None) -> FastAPI:
     register_document_routes(app)
     # In-app profile + resume editors.
     register_edit_routes(app)
+    # Privacy page + delete everything.
+    register_privacy_routes(app)
 
     @app.exception_handler(FileNotFoundError)
     async def _not_configured(_request: Request, exc: FileNotFoundError) -> JSONResponse:
@@ -1107,14 +1110,19 @@ async def _run_pipeline_task(
                 cfg.paths.jobs_json, excluded_companies=cfg.excluded_companies
             )
             store.load()
+            from ..llm.usage import month_spend
+
+            spent_before = month_spend()
             result = await asyncio.to_thread(
                 _dispatch, phase, cfg, store, bus, resume_filter
             )
+            run_cost = round(month_spend() - spent_before, 4)
             state.finish(phase, result)
+            cost_text = f" · Claude cost ≈ ${run_cost:.2f}" if run_cost > 0 else ""
             bus.publish_threadsafe(
                 ProgressEvent(
                     phase="done",
-                    message=f"{phase} complete{_result_summary(result)}",
+                    message=f"{phase} complete{_result_summary(result)}{cost_text}",
                     extra={"phase": phase, "result": result},
                 )
             )

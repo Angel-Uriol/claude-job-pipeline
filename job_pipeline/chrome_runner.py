@@ -23,6 +23,7 @@ Requirements on the user's machine (checked by `check_chrome`):
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import json
 import logging
 import os
@@ -35,6 +36,7 @@ from typing import Any
 from .config import Config, Secrets, load_secrets
 from .llm.base import extract_json
 from .llm.cli_client import STRIP_ENV, cli_model_alias, resolve_claude_cli
+from .llm.usage import tagged
 
 log = logging.getLogger(__name__)
 
@@ -134,11 +136,15 @@ async def _session(
         elif isinstance(msg, ResultMessage):
             result = msg.result or result
             cost = getattr(msg, "total_cost_usd", None)
+            from .llm.usage import record_cli_result
+
+            record_cli_result(model, msg)
     return (result or "\n".join(texts)).strip(), tools, cost
 
 
 def _run(coro: Any) -> Any:
-    return _EXECUTOR.submit(asyncio.run, coro).result()
+    ctx = contextvars.copy_context()  # keep the usage_feature tag
+    return _EXECUTOR.submit(ctx.run, asyncio.run, coro).result()
 
 
 def _require_cli(secrets: Secrets) -> str:
@@ -210,6 +216,7 @@ When done, reply with ONLY one JSON object (no markdown):
  "notes": "one line per company: what you searched and anything that blocked you"}}"""
 
 
+@tagged("premium-search")
 def run_premium(
     record: dict[str, Any],
     cfg: Config,
@@ -221,6 +228,13 @@ def run_premium(
     from .prompts import render_prompt
 
     s = secrets or load_secrets()
+    from .llm.base import LLMError
+    from .llm.budget import check
+
+    try:
+        check(s)  # monthly budget in "stop" mode
+    except LLMError as e:
+        raise ChromeRunError(str(e)) from e
     cli = _require_cli(s)
     names = [*record.get("ad_hoc_companies", []), *record.get("companies", [])]
     urls = [u for u in record.get("job_urls") or [] if u]

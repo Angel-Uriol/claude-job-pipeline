@@ -24,6 +24,7 @@ Live-verified shapes (Claude Code 2.1.x via the Agent SDK, Nov 2026):
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import json
 import re
 import tempfile
@@ -254,6 +255,9 @@ async def _cli_research(client: Any, prompt: str, model: str) -> WebEvidence:
                     else:
                         col.add(url, excerpt=text)
         elif isinstance(msg, ResultMessage):
+            from .usage import record_cli_result
+
+            record_cli_result(model, msg)
             if msg.is_error:
                 raise LLMError("Web research stopped before completion. Please retry.")
             if msg.result:
@@ -270,5 +274,6 @@ def web_research(client: ClaudeClient, prompt: str, *, model: str) -> WebEvidenc
     if isinstance(client, AnthropicAPIClient):
         return _api_research(client, prompt, model)
     if isinstance(client, ClaudeCodeClient):
-        return _EXECUTOR.submit(asyncio.run, _cli_research(client, prompt, model)).result()
+        ctx = contextvars.copy_context()  # keep the usage_feature tag
+        return _EXECUTOR.submit(ctx.run, asyncio.run, _cli_research(client, prompt, model)).result()
     raise LLMError("Web research is unavailable for this Claude client.")
