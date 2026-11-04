@@ -46,6 +46,15 @@ RESUME_HEADER = """\
 
 MAX_JSEARCH_QUERIES = 6
 
+US_NAMES = {"us", "usa", "u.s.", "united states", "united states of america"}
+# A "remote" posting mentioning one of these isn't US-remote.
+NON_US_TOKENS = (
+    "india", "canada", "united kingdom", " uk", "europe", "emea", "apac", "latam",
+    "germany", "netherlands", "ireland", "poland", "spain", "france", "brazil",
+    "mexico", "argentina", "australia", "singapore", "japan", "philippines",
+    "israel", "portugal", "romania", "ukraine",
+)
+
 
 def _example_config() -> dict[str, Any]:
     raw = yaml.safe_load((paths.EXAMPLES_DIR / "config.yaml").read_text(encoding="utf-8"))
@@ -56,7 +65,8 @@ def _example_config() -> dict[str, Any]:
 def _jsearch_queries(draft: ProfileDraft) -> list[dict[str, Any]]:
     """A few open-web searches from the Tier A/B functions + location."""
     functions = [f.name for f in (draft.target_functions or []) if f.tier in ("A", "B")]
-    place = (draft.location or "").strip()
+    # Where they want to WORK, not necessarily where they live.
+    place = (next(iter(draft.search_locations or []), "") or draft.location or "").strip()
     queries: list[dict[str, Any]] = []
     for fn in functions:
         if place:
@@ -93,6 +103,8 @@ def build_config(draft: ProfileDraft, companies: list[dict[str, Any]]) -> dict[s
     filters = cfg.setdefault("filters", {})
     filters["location_tokens"] = [t.lower() for t in (draft.location_tokens or [])]
     filters["allow_remote"] = bool(draft.allow_remote)
+    if (draft.remote_country or "").strip().lower() in US_NAMES:
+        filters["remote_excluded_tokens"] = list(NON_US_TOKENS)
     # No location words at all → don't silently drop every job.
     filters["location_filter_enabled"] = bool(filters["location_tokens"]) or not draft.allow_remote
     cfg.setdefault("chrome_claude", {})["exclude_companies"] = []
@@ -133,7 +145,9 @@ def build_files(state: InterviewState) -> dict[str, str]:
     """Render the profile files as YAML text (for review). Validates both."""
     cfg = build_config(state.draft, state.companies)
     Config(**cfg)  # raises pydantic.ValidationError on anything malformed
-    resume = state.resume_content or skeleton_resume(state.draft)
+    resume = copy.deepcopy(state.resume_content or skeleton_resume(state.draft))
+    if state.draft.resume_location:
+        resume.setdefault("header", {})["location"] = state.draft.resume_location
     ResumeContent(**resume)
     return {
         "config.yaml": CONFIG_HEADER + "\n" + _dump(cfg),

@@ -30,7 +30,7 @@ profile:
   must_have_skills: ["python"]
   preferred_skills: ["go", "postgresql", "kafka", "aws", "docker", "kubernetes", "sql", "react"]
   excluded_titles: ["director", "principal", "staff", "vp", "head of", "manager"]
-  max_years_required: 0          # 0 = automatic (years_experience + 5)
+  max_years_required: 0          # 0 = automatic (years_experience + 3)
   location_preference: "San Francisco Bay Area, or fully remote within the US"
   salary_floor: "$150k base"
   highlights:
@@ -87,6 +87,7 @@ dead_companies: []
 scoring:
   pre_filter_model: "claude-haiku-5-5"
   deep_fit_model: "claude-sonnet-5-5"
+  max_jobs_per_run: 40   # each job = 1 Claude call; the rest wait for the next run
   thresholds:
     apply: 8.0      # fit_score >= apply    → verdict "apply"
     consider: 5.0   # fit_score >= consider → "consider"; below → "skip"

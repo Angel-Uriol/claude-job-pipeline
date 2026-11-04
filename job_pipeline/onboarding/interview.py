@@ -38,6 +38,7 @@ from pydantic import BaseModel, Field
 
 from .. import paths
 from ..llm import ClaudeClient
+from ..resume.skills import SOFT_SKILLS
 
 # How many past messages Claude sees each turn (the draft carries the rest).
 HISTORY_WINDOW = 16
@@ -123,6 +124,12 @@ class ProfileDraft(BaseModel):
     location_preference: str | None = None
     location_tokens: list[str] | None = None
     allow_remote: bool | None = None
+    # "US" etc. when remote roles must be in one country ("remote within the US").
+    remote_country: str | None = None
+    # Human-readable places to search in, e.g. ["San Francisco Bay Area"].
+    search_locations: list[str] | None = None
+    # Location printed on the resume header, if different from `location`.
+    resume_location: str | None = None
     salary_floor: str | None = None
     highlights: list[str] | None = None
     honest_gaps: list[str] | None = None
@@ -163,6 +170,7 @@ BUILD_FIELDS: dict[str, str] = {
 OPTIONAL_FIELDS: dict[str, str] = {
     "excluded_titles": "title words that mean 'too senior / wrong role'",
     "salary_floor": "minimum acceptable compensation",
+    "resume_location": "location to show on the resume header (if not where they live)",
     "highlights": "2-5 proudest, quantified accomplishments",
     "deal_breakers": "anything that rules a job out",
     "dream_companies": "companies they'd be most excited about",
@@ -283,20 +291,31 @@ Style:
   cover the likely answers. The user can always type their own answer, so
   don't add an "Other" option. Use free text (empty options) only for
   things like name, email, or "describe what you did".
-- Set multi_select=true when several options can apply (skills, locations).
+- Set multi_select=true whenever several options can apply: kinds of roles,
+  levels, locations, skills, gaps, deal-breakers, title words, companies.
+- Ask about ONE field per question when you give options — never one chip set
+  for two different things (e.g. dream companies vs. companies to avoid).
 - Friendly and concise. No markdown headings, no lists in questions.
 - Confirm what the resume already says instead of asking from scratch.
 
 Extraction:
 - Put into `updates` ONLY fields the latest answer settles. Lists are full
   replacements — send the whole updated list.
-- target_functions: each kind of role with a tier — A best fit, B good fit,
-  C stretch / career pivot.
+- target_functions: EVERY kind of role the user names, each with a tier that
+  follows their own ranking — "mainly/most" → A, "also open to" → B,
+  "stretch/maybe" → C. Never drop one they mentioned.
 - search_keywords: 3-6 job-title phrases to search for (e.g. "data engineer",
   "analytics engineer"), derived from target_functions.
 - location_tokens: lowercase substrings that appear in matching job location
   strings (cities, metro names, state names, abbreviations like ", tx"). Never
   "remote" — set allow_remote instead.
+- search_locations: the places they want to WORK, human-readable (e.g. "San
+  Francisco Bay Area") — not where they live, if different.
+- remote_country: set it (e.g. "US") when they limit remote roles to a country.
+- preferred_skills: real tools/technologies only (no soft skills like
+  "analytical"). Whenever the user mentions a tool they've used — in any
+  answer — add it here. Never keep a skill here that honest_gaps says they
+  lack in production.
 - excluded_titles: lowercase words like "director", "intern".
 - HONESTY: never invent experience, skills, metrics or credentials. Record
   only what the user actually said. honest_gaps may be an empty list."""
@@ -410,6 +429,25 @@ def start(state: InterviewState) -> InterviewState:
     return state
 
 
+def _plural(n: int, word: str) -> str:
+    return f"{n} {word}{'' if n == 1 else 's'}"
+
+
+def clean_skills(skills: list[str], gaps: list[str] | None) -> list[str]:
+    """Dedupe, drop soft skills, and drop anything an honest gap rules out
+    (e.g. "c++" when a gap says "C++ in production (academic only)")."""
+    gap_text = " ".join(gaps or []).lower()
+    out: list[str] = []
+    for s in skills:
+        k = s.strip().lower()
+        if not k or k in SOFT_SKILLS or k in out:
+            continue
+        if gap_text and re.search(rf"(?<![a-z0-9]){re.escape(k)}(?![a-z0-9])", gap_text):
+            continue
+        out.append(k)
+    return out
+
+
 def prefill_from_resume(state: InterviewState, content: dict[str, Any]) -> None:
     """Seed the draft with header facts from a parsed resume (no LLM call)."""
     state.resume_content = content
@@ -423,7 +461,7 @@ def prefill_from_resume(state: InterviewState, content: dict[str, Any]) -> None:
     d.location = d.location or (h.get("location") or None)
     if d.preferred_skills is None:
         skills = [s for g in (content.get("skills") or {}).values() for s in (g or [])]
-        d.preferred_skills = [s.lower() for s in skills][:25] or None
+        d.preferred_skills = clean_skills(skills, d.honest_gaps)[:30] or None
 
 
 def resume_received(state: InterviewState, content: dict[str, Any]) -> None:
@@ -433,8 +471,9 @@ def resume_received(state: InterviewState, content: dict[str, Any]) -> None:
     n_bullets = sum(len(e.get("bullets") or []) for e in exps.values())
     name = ((content.get("header") or {}).get("name") or "").split(" ")[0]
     state.say(
-        f"Got it{', ' + name if name else ''} — I read {len(exps)} roles and {n_bullets} "
-        "bullet points. I'll only ask about what your resume doesn't already say.",
+        f"Got it{', ' + name if name else ''} — I read {_plural(len(exps), 'role')} and "
+        f"{_plural(n_bullets, 'bullet point')}. "
+        "I'll only ask about what your resume doesn't already say.",
         kind="note",
     )
     state.phase = "round1"
@@ -467,6 +506,9 @@ def _ask(state: InterviewState, *, llm: ClaudeClient, model: str) -> InterviewTu
         tool_description="Submit extracted profile updates and the next question.",
     )
     _merge(state.draft, turn.updates)
+    if state.draft.preferred_skills:
+        state.draft.preferred_skills = clean_skills(state.draft.preferred_skills,
+                                                    state.draft.honest_gaps)
     return turn
 
 
@@ -556,7 +598,8 @@ def draft_to_profile_dict(draft: ProfileDraft) -> dict[str, Any]:
     """Draft -> the `profile:` mapping of config.yaml (pipeline-only fields removed)."""
     d = draft.model_dump(exclude_none=True)
     for k in ("location_tokens", "allow_remote", "excluded_companies", "industry",
-              "search_keywords", "experience_entries", "projects", "education"):
+              "search_keywords", "experience_entries", "projects", "education",
+              "remote_country", "search_locations", "resume_location"):
         d.pop(k, None)
     d.setdefault("name", "")
     d.setdefault("email", "")

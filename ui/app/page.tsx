@@ -34,7 +34,8 @@ import type {
 } from "@/lib/types";
 
 const DEFAULT_FILTERS: FilterState = {
-  posted_within: 15,
+  // "all": the first scrape's best matches may be older than two weeks.
+  posted_within: "all",
   location: "preferred_or_remote",
   min_score: 70,
   verdict: new Set<Verdict>(["apply", "consider"]),

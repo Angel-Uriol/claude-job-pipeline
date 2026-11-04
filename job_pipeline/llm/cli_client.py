@@ -104,6 +104,20 @@ def resolve_claude_cli(configured: str = "") -> str | None:
     return None
 
 
+def cli_model_alias(model: str) -> str:
+    """Full model id → the CLI's family alias ("claude-sonnet-5-5" → "sonnet").
+
+    Older Claude Code CLIs don't know newer model ids (they log
+    `unrecognized_model`); the aliases always resolve to the newest model of
+    that family the installed CLI supports. Unknown names pass through.
+    """
+    m = model.lower()
+    for family in ("opus", "sonnet", "haiku"):
+        if family in m:
+            return family
+    return model
+
+
 class ClaudeCodeClient:
     """``ClaudeClient`` backed by the Claude Agent SDK + local Claude Code CLI."""
 
@@ -139,6 +153,7 @@ class ClaudeCodeClient:
         return env
 
     async def _run_async(self, prompt: str, model: str, system: str | None) -> str:
+        model = cli_model_alias(model)
         from claude_agent_sdk import (
             AssistantMessage,
             ClaudeAgentOptions,

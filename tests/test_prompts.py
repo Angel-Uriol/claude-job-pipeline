@@ -51,10 +51,10 @@ def test_sponsorship_rules_follow_profile() -> None:
 
 def test_max_years_auto_and_override() -> None:
     p = CFG.profile.model_copy()
-    p.years_experience, p.max_years_required = 2, 0
-    assert max_years_required(p) == 7
+    p.years_experience, p.max_years_required = 3, 0
+    assert max_years_required(p) == 6
     p.years_experience = 0
-    assert max_years_required(p) == 5
+    assert max_years_required(p) == 4
     p.max_years_required = 12
     assert max_years_required(p) == 12
 

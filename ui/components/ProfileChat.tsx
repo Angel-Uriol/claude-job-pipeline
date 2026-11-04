@@ -313,6 +313,16 @@ function JobStrip({ jobs }: { jobs: MarketJob[] }) {
           <div className="truncate text-[11px] text-slate-500">
             {j.location || "—"} <span className="opacity-0 transition group-hover:opacity-100">↗</span>
           </div>
+          {j.reason && (
+            <div className="mt-1 flex items-start gap-1.5 text-[11px] text-cyan-200/80">
+              {typeof j.score === "number" && j.score > 0 && (
+                <span className="rounded bg-cyan-400/10 px-1 font-semibold text-cyan-300">
+                  {Math.round(j.score * 10)}
+                </span>
+              )}
+              <span className="line-clamp-2">{j.reason}</span>
+            </div>
+          )}
         </a>
       ))}
     </div>

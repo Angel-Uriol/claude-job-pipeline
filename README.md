@@ -40,7 +40,7 @@ Open **http://localhost:8766**. The first visit takes you to the **Setup** page:
 |---|---|
 | 1. Install | One click installs what's still missing: the resume renderer, and (optionally) the Claude Code CLI via Anthropic's official installer. |
 | 2. Connect Claude | Paste an Anthropic API key, **or** use your local Claude Code login (see below). |
-| 3. Your profile | One chat with Claude, mostly tap-to-answer options. It starts with "Do you have a resume?" — upload it right in the chat, or say no and Claude builds one with you (industry, experience, projects). Then three rounds: **About you** → Claude scans real open postings → **What the market asks** ("3 of the 8 roles I found ask for Kafka — have you used it?") → a second, sharper scan → **Sharpen**. |
+| 3. Your profile | One chat with Claude, mostly tap-to-answer options. It starts with "Do you have a resume?" — upload it right in the chat, or say no and Claude builds one with you (industry, experience, projects). Then three rounds: **About you** → a live mini-pipeline (scrape the job boards → apply your location/title rules → Claude rates the top candidates → shows the best with reasons) → **What the market asks** ("3 of the 8 roles I found ask for Kafka — have you used it?") → a second, sharper scan → **Sharpen**. |
 | 4. Companies | Pre-filled with the employers found during the scans (job boards already verified); trim, add, re-check. |
 | 5. Review & save | See the three generated YAML files, then save. |
 
@@ -87,7 +87,10 @@ Rough numbers per run with the default models:
 | Setup (one time) | both | a few cents |
 
 The scrape filters (location, posting age, excluded titles) run **before** any LLM
-call, so most postings never cost anything. Change the models in `profile/config.yaml`.
+call, so most postings never cost anything. Each scoring phase also stops at
+`scoring.max_jobs_per_run` (default 40) jobs per run — target companies and the
+newest postings first — so a big first scrape can't run up a surprise bill; run
+again for the next batch. Change models and the cap in your profile's `config.yaml`.
 
 ## What lives where
 
@@ -172,6 +175,11 @@ thresholds in config. Jobs at your target companies get a tier bump (+0.3 to +0.
 
 - **Open-web search (JSearch):** add a free RapidAPI key as `JSEARCH_API_KEY` in
   `.env`. Setup writes a few queries for you, and the **Search web** button runs them.
+- **✨ Premium search (Claude in Chrome):** on the Companies step, pick companies
+  (by default the ones with no public job board) and queue a premium search:
+  Claude in Chrome browses their own careers sites like a person would. It's the
+  most thorough search, but uses many more tokens and needs permission to control
+  Chrome. Results are tagged with the profile and land in its Discover tab.
 - **Chrome Claude (browser agent):** companies without a public board get a
   copy-paste prompt in the digest. Or use **Run Chrome Claude** in Discover to queue
   a run, which a Claude Code session with the

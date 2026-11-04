@@ -43,6 +43,13 @@ from ..onboarding.writer import build_files, write_files
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
+# What the user runs in Claude Code (with the Claude in Chrome extension) so a
+# session works through queued browser searches.
+WATCHER_COMMAND = (
+    "/loop 30s drain any pending chrome-claude run requests by following "
+    "prompts/chrome_claude_runbook.md"
+)
+
 
 class AuthBody(BaseModel):
     mode: Literal["api_key", "claude_code"]
@@ -52,6 +59,10 @@ class AuthBody(BaseModel):
 
 class InstallBody(BaseModel):
     component: Literal["renderer", "claude_cli"]
+
+
+class PremiumBody(BaseModel):
+    companies: list[str]
 
 
 class LoginInputBody(BaseModel):
@@ -249,6 +260,33 @@ def register_setup_routes(app: FastAPI) -> None:
         state.companies = await asyncio.to_thread(verify_companies, body.companies)
         state.save()
         return _state_payload(state)
+
+    # Premium search: queue a Claude-in-Chrome run of specific companies'
+    # careers sites for THIS profile (see chrome_queue + the runbook).
+    @app.post("/api/setup/premium")
+    async def setup_premium(body: PremiumBody) -> dict[str, Any]:
+        from ..chrome_queue import ChromeQueue
+
+        names = [n.strip() for n in body.companies if n.strip()]
+        if not names:
+            raise HTTPException(400, "Pick at least one company.")
+        state = InterviewState.load()
+        known = {c["name"].lower(): c for c in state.companies}
+        record = ChromeQueue().enqueue(
+            scope="mix",
+            ad_hoc_companies=names,
+            score_after=True,
+            extra_notes="Premium search requested from Setup. Careers pages, if known: "
+            + "; ".join(f"{n}: {(known.get(n.lower()) or {}).get('careers_url') or 'find it'}"
+                        for n in names),
+            profile=None if paths.pinned_profile_dir() else paths.active_slug(),
+            premium=True,
+        )
+        for c in state.companies:
+            if c["name"].lower() in {n.lower() for n in names}:
+                c["premium"] = True
+        state.save()
+        return {"queued": record, "watcher_command": WATCHER_COMMAND}
 
     @app.get("/api/setup/preview")
     async def setup_preview() -> dict[str, Any]:

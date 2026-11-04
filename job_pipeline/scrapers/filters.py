@@ -104,6 +104,9 @@ def passes_location_filter(location: str, cfg: Config) -> bool:
         # not full remote. Reject those when the city isn't allowed.
         if is_disqualified_hybrid(location, cfg.filters.hybrid_disqualifiers):
             return False
+        # "Remote - India" isn't remote-in-the-US.
+        if is_disqualified_hybrid(location, cfg.filters.remote_excluded_tokens):
+            return False
         return True
     return False
 

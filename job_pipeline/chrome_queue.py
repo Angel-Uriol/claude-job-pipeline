@@ -55,7 +55,9 @@ def _now() -> str:
 class ChromeQueue:
     """A tiny on-disk queue of Chrome-Claude run requests."""
 
-    def __init__(self, base_dir: Path | str = _DEFAULT_BASE) -> None:
+    def __init__(self, base_dir: Path | str | None = None) -> None:
+        # Resolved at call time (not def time) so tests can redirect it.
+        base_dir = _DEFAULT_BASE if base_dir is None else base_dir
         self.base = Path(base_dir)
         self.pending_dir = self.base / "pending"
         self.done_dir = self.base / "done"
@@ -71,8 +73,14 @@ class ChromeQueue:
         score_after: bool = False,
         ad_hoc_companies: list[str] | None = None,
         extra_notes: str = "",
+        profile: str | None = None,
+        premium: bool = False,
     ) -> dict[str, Any]:
         """Write a new pending request and return its record.
+
+        `profile` names the profile the results belong to (the watcher passes
+        `--profile` to the import). `premium` marks a user-requested deep
+        search of specific companies' own careers sites.
 
         `scope` is one of selected | new | mix. `companies` only matters
         when the scope includes "selected" — it narrows which no_api
@@ -95,6 +103,8 @@ class ChromeQueue:
             "posted_within": posted_within,
             "score_after": bool(score_after),
             "extra_notes": extra_notes,
+            "profile": profile,
+            "premium": bool(premium),
             "status": STATUS_PENDING,
             "created_at": _now(),
             "started_at": None,

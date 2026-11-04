@@ -31,6 +31,10 @@ Description:
 
 {bullets_json}
 
+# CURRENT SKILLS (the only skills you may feature)
+
+{skills_list}
+
 # YOUR TASK
 
 Rewrite the summary and each bullet to foreground what THIS job cares about,
@@ -38,5 +42,11 @@ using only the facts above. Then call the `submit_tailored_resume` tool with:
 - `summary`: the reworded summary (3–5 sentences, honest).
 - `bullets`: an array of objects, each with the original `id` and the rewritten
   `text`. Include every bullet id you were given.
+- `featured_skills`: the skills from CURRENT SKILLS that matter for THIS job,
+  most relevant first (copy each name exactly). Leave out ones irrelevant to
+  the role (e.g. hardware skills for a backend job). Never add a skill that
+  isn't in the list.
+
+Write the summary in resume voice: no name, no "I", no he/she/they.
 
 Do not write any prose outside the tool call.

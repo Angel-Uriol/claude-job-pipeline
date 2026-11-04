@@ -627,6 +627,7 @@ function CompaniesStep({
               Add
             </button>
           </div>
+          {verified && <PremiumSearch companies={companies} onError={onError} />}
           <div className="mt-5 flex flex-wrap gap-3">
             <button
               type="button"
@@ -653,6 +654,92 @@ function CompaniesStep({
         </>
       )}
     </section>
+  );
+}
+
+// Premium search: Claude in Chrome browses chosen companies' own careers
+// sites. Opt-in, because it costs more tokens and needs browser control.
+function PremiumSearch({
+  companies,
+  onError,
+}: {
+  companies: SetupCompany[];
+  onError: (m: string | null) => void;
+}) {
+  const candidates = companies.filter((c) => c.selected ?? true);
+  const [picked, setPicked] = useState<string[]>(
+    candidates.filter((c) => c.platform === null).map((c) => c.name),
+  );
+  const [queued, setQueued] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const toggle = (name: string) =>
+    setPicked((p) => (p.includes(name) ? p.filter((x) => x !== name) : [...p, name]));
+
+  const queue = async () => {
+    setBusy(true);
+    onError(null);
+    try {
+      const r = await api.setupPremium(picked);
+      setQueued(r.watcher_command);
+    } catch (e) {
+      onError(errText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-6 rounded-xl border border-violet-300/60 bg-violet-50/60 p-4 dark:border-violet-500/30 dark:bg-violet-500/10">
+      <div className="flex items-center gap-2 text-sm font-semibold text-violet-800 dark:text-violet-200">
+        ✨ Premium search <span className="rounded bg-violet-200/70 px-1.5 text-[10px] dark:bg-violet-500/20">optional</span>
+      </div>
+      <p className="mt-1 text-xs text-violet-900/80 dark:text-violet-100/80">
+        Claude in Chrome opens each company&apos;s own careers site and searches it like a person
+        would — the most thorough and up-to-date search, and the only way to cover companies without
+        a public job board. It <b>uses many more tokens</b> than the regular scrape and needs
+        <b> permission to control Chrome on your computer</b> (the Claude in Chrome extension).
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {candidates.map((c) => {
+          const on = picked.includes(c.name);
+          return (
+            <button
+              key={c.name}
+              type="button"
+              onClick={() => toggle(c.name)}
+              className={`rounded-full border px-3 py-1 text-xs transition ${
+                on
+                  ? "border-violet-500 bg-violet-600 text-white"
+                  : "border-violet-300 text-violet-800 hover:bg-violet-100 dark:border-violet-500/40 dark:text-violet-200 dark:hover:bg-violet-500/20"
+              }`}
+            >
+              {c.name}
+              {c.platform === null && " · no public board"}
+            </button>
+          );
+        })}
+      </div>
+      {queued ? (
+        <div className="mt-3 space-y-2 text-xs text-violet-900 dark:text-violet-100">
+          <p>
+            ✓ Queued. To run it: open Claude Code (with the Claude in Chrome extension connected) in
+            this project folder and paste:
+          </p>
+          <code className="block select-all break-all rounded bg-white/70 p-2 dark:bg-slate-900">{queued}</code>
+          <p>Found jobs are scored and added to this profile&apos;s Discover tab automatically.</p>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => void queue()}
+          disabled={busy || picked.length === 0}
+          className="mt-3 rounded-lg bg-violet-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:opacity-50"
+        >
+          {busy ? "Queuing…" : `Queue premium search (${picked.length})`}
+        </button>
+      )}
+    </div>
   );
 }
 

@@ -21,6 +21,14 @@ runs are executed, not what counts as a match.
   relative `data/` paths resolve. Use the repo venv: `.venv/bin/python`
   (shown as `$PY`).
 
+## Profiles
+Each request may carry a `profile` (a slug under `profiles/`). When it does, add
+`--profile <slug>` to EVERY `job_pipeline.cli` command for that request (claim
+details, import, scoring) so results land in that person's history — never in
+whatever profile happens to be active. Requests with `"premium": true` were
+asked for explicitly by the user for specific companies: search those
+companies' own careers sites thoroughly (all relevant teams and locations).
+
 ## How to run it
 - **As a watcher loop (closest to one-click):**
   `/loop 30s drain any pending chrome-claude run requests by following prompts/chrome_claude_runbook.md`

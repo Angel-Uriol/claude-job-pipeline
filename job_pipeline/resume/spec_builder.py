@@ -17,6 +17,7 @@ from typing import Any
 from ..models import Job
 from .content_loader import ResumeContent
 from .families import FamilyConfig, select_bullets, select_project_bullets
+from .skills import is_soft_skill
 
 
 def build_resume_spec(
@@ -74,7 +75,7 @@ def build_resume_spec(
     skills_dict = content.skills.model_dump()
     skills_out: list[dict[str, Any]] = []
     for group_name in family.skill_order:
-        items = skills_dict.get(group_name) or []
+        items = [i for i in skills_dict.get(group_name) or [] if not is_soft_skill(i)]
         if not items:
             continue
         skills_out.append({"group": _humanize(group_name), "items": items})

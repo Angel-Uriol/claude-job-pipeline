@@ -146,3 +146,12 @@ def test_claude_code_client_passes_setup_token_to_child(monkeypatch: pytest.Monk
     env = cc.ClaudeCodeClient(oauth_token="sk-ant-oat01-abc")._child_env()
     assert env["CLAUDE_CODE_OAUTH_TOKEN"] == "sk-ant-oat01-abc"
     assert env["PATH"].startswith("/opt/bin")
+
+
+def test_cli_model_alias() -> None:
+    from job_pipeline.llm.cli_client import cli_model_alias
+
+    assert cli_model_alias("claude-sonnet-5-5") == "sonnet"
+    assert cli_model_alias("claude-haiku-5-5") == "haiku"
+    assert cli_model_alias("claude-opus-5-5") == "opus"
+    assert cli_model_alias("custom-model") == "custom-model"

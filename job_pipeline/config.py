@@ -118,7 +118,7 @@ class Profile(BaseModel):
     preferred_skills: list[str] = Field(default_factory=list)
     excluded_titles: list[str] = Field(default_factory=list)
     # Pre-filter hard-skips JDs asking for MORE years than this.
-    # 0 = automatic (years_experience + 5, at least 5).
+    # 0 = automatic (years_experience + 3, at least 4).
     max_years_required: int = 0
     # Plain-English location rule, e.g. "Bay Area or fully remote in the US".
     location_preference: str = ""
@@ -222,6 +222,9 @@ class Scoring(BaseModel):
 
     pre_filter_model: str = "claude-haiku-5-5"
     deep_fit_model: str = "claude-sonnet-5-5"
+    # Max jobs each scoring phase sends to Claude per run (0 = no cap). One
+    # call per job, so this bounds time and token use; the rest wait.
+    max_jobs_per_run: int = Field(default=40, ge=0)
     thresholds: Thresholds = Field(default_factory=lambda: Thresholds(apply=8.0, consider=5.0))
 
 
@@ -277,6 +280,9 @@ class Filters(BaseModel):
         default_factory=lambda: ["remote", "anywhere", "distributed"]
     )
     hybrid_disqualifiers: list[str] = Field(default_factory=lambda: ["hybrid"])
+    # A remote posting that mentions one of these fails (e.g. non-US
+    # countries when the candidate wants "remote within the US").
+    remote_excluded_tokens: list[str] = Field(default_factory=list)
 
 
 class RateLimits(BaseModel):

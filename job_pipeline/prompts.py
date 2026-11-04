@@ -54,7 +54,9 @@ def max_years_required(profile: Profile) -> int:
     """Hard-skip threshold for 'years required' in a JD."""
     if profile.max_years_required > 0:
         return profile.max_years_required
-    return max(5, profile.years_experience + 5)
+    # +3 keeps "one notch up" stretch roles (3 yrs → 5+ ok) but skips clearly
+    # senior asks (3 yrs → 6+ skipped). Deep-fit's level axis handles nuance.
+    return max(4, profile.years_experience + 3)
 
 
 def _bullets(items: list[str], empty: str = "(none)") -> str:

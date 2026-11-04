@@ -1036,7 +1036,7 @@ async def _run_pipeline_task(
             bus.publish_threadsafe(
                 ProgressEvent(
                     phase="done",
-                    message=f"{phase} complete",
+                    message=f"{phase} complete{_result_summary(result)}",
                     extra={"phase": phase, "result": result},
                 )
             )
@@ -1050,6 +1050,15 @@ async def _run_pipeline_task(
                     extra={"phase": phase, "error": str(e)},
                 )
             )
+
+
+def _result_summary(result: Any) -> str:
+    """' — inserted 3, skipped 1' from a phase's counts dict (skips zeros)."""
+    if not isinstance(result, dict):
+        return ""
+    parts = [f"{k.replace('_', ' ')} {v}" for k, v in result.items()
+             if isinstance(v, int) and not isinstance(v, bool) and v]
+    return f" — {', '.join(parts)}" if parts else ""
 
 
 def _resume_tailorer_for(cfg: Config) -> Any:

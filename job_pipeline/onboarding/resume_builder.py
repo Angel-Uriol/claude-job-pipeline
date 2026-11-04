@@ -34,7 +34,8 @@ Rules:
   gave exactly; never add numbers, tools, employers, titles or dates they
   didn't mention. Leave a date empty if unknown.
 - Projects from `projects`; education from `education`.
-- summary: 2-3 honest sentences for the roles they're targeting.
+- summary: 2-3 honest sentences for the roles they're targeting, in resume
+  voice (no name, no "I", no he/she/they).
 - Skills: bucket their stated skills (languages, data_platform, cloud, ml,
   frontend, other). Nothing they didn't claim; skip anything listed in
   honest_gaps."""
@@ -79,11 +80,22 @@ def finish(state: InterviewState, *, llm: ClaudeClient, model: str) -> Interview
         except LLMError:
             extra = " I couldn't draft your resume automatically; you can fill it in on review."
     picked = sum(1 for c in state.companies if c.get("selected", True))
+    no_board = [c["name"] for c in state.companies
+                if c.get("selected", True) and c.get("platform") is None and "platform" in c]
     state.say(
         "All set! Your profile is ready." + extra
         + (f" I've already lined up {picked} companies to search — next you can trim or add "
            "to that list." if picked else " Next, let's pick the companies to search."),
         kind="note",
     )
+    if no_board:
+        state.say(
+            f"Tip: {', '.join(no_board[:4])} {'has' if len(no_board) == 1 else 'have'} no public "
+            "job board, so the regular scrape can't see them. On the next step you can turn on a "
+            "✨ premium search: Claude in Chrome browses their own careers sites like a person "
+            "would. It finds more, but uses more tokens and needs permission to control Chrome "
+            "on your computer.",
+            kind="note",
+        )
     state.save()
     return state

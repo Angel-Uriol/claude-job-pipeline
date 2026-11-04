@@ -328,6 +328,8 @@ export interface MarketJob {
   title: string;
   url: string;
   location: string;
+  score?: number;
+  reason?: string;
 }
 
 export interface SetupMessage {

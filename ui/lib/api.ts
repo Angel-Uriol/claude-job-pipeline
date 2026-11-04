@@ -175,6 +175,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ companies }),
     }),
+  setupPremium: (companies: string[]) =>
+    request<{ queued: { id: string }; watcher_command: string }>("/api/setup/premium", {
+      method: "POST",
+      body: JSON.stringify({ companies }),
+    }),
   setupPreview: () => request<{ files: Record<string, string> }>("/api/setup/preview"),
   setupCommit: () =>
     request<{ written: string[]; configured: boolean }>("/api/setup/commit", { method: "POST" }),

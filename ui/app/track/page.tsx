@@ -190,7 +190,13 @@ export default function TrackPage() {
         </div>
         <div className="flex items-center gap-2">
           <a
-            href={api.trackerCsvUrl(filters)}
+            // Built on click: the API host differs between server render and
+            // browser (localhost vs 127.0.0.1), which caused a hydration warning.
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              window.location.assign(api.trackerCsvUrl(filters));
+            }}
             className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             ⬇ Export CSV

@@ -104,7 +104,7 @@ def test_resume_received_moves_to_round1() -> None:
     resume_received(state, {"header": {"name": "Sam Lee"}, "experiences": {
         "x": {"bullets": [{"text": "a"}, {"text": "b"}]}}})
     assert state.phase == "round1"
-    assert "1 roles and 2 bullet" in state.messages[-1].text
+    assert "1 role and 2 bullet points" in state.messages[-1].text
     assert "industry" not in state.missing()  # upload mode: no build fields
 
 

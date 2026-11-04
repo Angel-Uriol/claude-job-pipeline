@@ -526,6 +526,7 @@ def run_pre_filter(
             message="Nothing to pre-filter.",
         )
         return counts
+    targets = _cap_targets(targets, cfg, "pre-filter", progress)
 
     client = ClaudePreFilterClient(
         llm=llm or build_llm(secrets), model=cfg.scoring.pre_filter_model
@@ -579,6 +580,32 @@ def run_pre_filter(
     return counts
 
 
+def _cap_targets(
+    targets: list[Job], cfg: Config, phase: str, progress: ProgressCallback | None
+) -> list[Job]:
+    """Score at most `scoring.max_jobs_per_run` jobs per run (0 = no cap).
+
+    Each job is one Claude call, so a first scrape of hundreds of postings
+    would otherwise take a long time and many tokens. Target companies and
+    the newest postings go first; the rest wait for the next run.
+    """
+    cap = cfg.scoring.max_jobs_per_run
+    if cap <= 0 or len(targets) <= cap:
+        return targets
+    # Newest first, then (stable sort) target companies ahead of the rest.
+    ordered = sorted(targets, key=lambda j: j.posted_date or j.discovered_at, reverse=True)
+    ordered.sort(key=lambda j: not j.is_target_company)
+    _emit(
+        progress,
+        phase=phase,
+        i=0,
+        total=cap,
+        message=(f"Scoring the top {cap} of {len(targets)} jobs this run "
+                 f"(scoring.max_jobs_per_run); run again for the next batch."),
+    )
+    return ordered[:cap]
+
+
 # --- deep-fit -----------------------------------------------------------
 
 
@@ -610,6 +637,7 @@ def run_deep_fit(
             message="Nothing to deep-fit.",
         )
         return counts
+    targets = _cap_targets(targets, cfg, "deep-fit", progress)
 
     client = ClaudeDeepFitClient(llm=llm or build_llm(secrets), model=cfg.scoring.deep_fit_model)
     fitter = DeepFitter(client, render_prompt_file(prompt_path, cfg))
@@ -668,7 +696,7 @@ def run_deep_fit(
             consider_threshold=cfg.scoring.thresholds.consider,
         )
 
-        job.fit_score = fit_score
+        job.fit_score = round(fit_score, 2)
         job.fit_verdict = verdict
         job.fit_subscores = ScoreResult(**result.scores.model_dump())
         job.fit_justification = result.justification
