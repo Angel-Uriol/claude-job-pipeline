@@ -50,6 +50,7 @@ from ..runner import (
 )
 from ..store import JobStore
 from .document_routes import register_document_routes
+from .edit_routes import register_edit_routes
 from .events import EventBus, PipelineState, event_to_dict
 from .profile_routes import register_profile_routes
 from .research_routes import register_research_routes
@@ -221,6 +222,8 @@ def create_app(*, config_path: str | Path | None = None) -> FastAPI:
     register_today_routes(app)
     # Cover letters, review changes, print view.
     register_document_routes(app)
+    # In-app profile + resume editors.
+    register_edit_routes(app)
 
     @app.exception_handler(FileNotFoundError)
     async def _not_configured(_request: Request, exc: FileNotFoundError) -> JSONResponse:

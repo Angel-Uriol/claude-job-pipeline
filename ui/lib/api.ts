@@ -294,6 +294,17 @@ export const api = {
 
   getTaskStatus: () => request<TaskStatusResponse>("/api/tasks/current"),
 
+  // --- in-app editors (no YAML) ---
+  getProfileInfo: () => request<{ profile: Record<string, unknown> }>("/api/profile"),
+  saveProfileInfo: (profile: Record<string, unknown>) =>
+    request<{ saved: boolean }>("/api/profile", { method: "PUT", body: JSON.stringify({ profile }) }),
+  getResume: () => request<{ resume: Record<string, unknown> }>("/api/resume"),
+  saveResume: (resume: Record<string, unknown>, confirm = false) =>
+    request<{ saved: boolean; warnings: string[] }>("/api/resume", {
+      method: "PUT",
+      body: JSON.stringify({ resume, confirm }),
+    }),
+
   // --- cover letters, review changes, print view ---
   coverLetter: (key: string) =>
     request<CoverLetterResult>(`/api/jobs/${encodeURIComponent(key)}/cover-letter`, { method: "POST" }),

@@ -16,6 +16,7 @@ const TABS: { href: string; label: string }[] = [
   { href: "/applications", label: "Applications" },
   { href: "/compare", label: "Compare" },
   { href: "/interview", label: "Interview prep" },
+  { href: "/profile", label: "My info" },
   { href: "/setup", label: "Setup" },
 ];
 
@@ -33,7 +34,11 @@ export default function TabNav() {
           </span>
           {TABS.map((t) => {
             const active =
-              t.href === "/" ? pathname === "/" : pathname.startsWith(t.href);
+              t.href === "/"
+                ? pathname === "/"
+                : t.href === "/profile"
+                  ? pathname === "/profile" || pathname === "/resume"
+                  : pathname.startsWith(t.href);
             return (
               <Link
                 key={t.href}
