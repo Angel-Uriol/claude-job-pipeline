@@ -29,6 +29,8 @@ Description:
 
 # YOUR TASK
 
-Return a greeting (use "Dear {company} hiring team," unless the posting names
-a person), 3 body paragraphs with their evidence ids, and a one-line sign-off
+Return a greeting (use "Dear <company> hiring team," unless the posting names
+a person). Everywhere in the letter, write the company name the way the company
+itself writes it (e.g. "Anthropic", "DuckDuckGo"), even if it appears in
+lowercase above. Then return 3 body paragraphs with their evidence ids, and a one-line sign-off
 before the name (e.g. "Thank you for your time and consideration.").

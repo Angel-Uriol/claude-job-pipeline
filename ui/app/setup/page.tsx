@@ -219,6 +219,8 @@ function InstallStep({
         needed if you want to use your Claude login instead of an API key.
       </p>
 
+      <DemoOffer />
+
       {checks === null ? (
         <p className="mt-4 text-sm text-slate-400">Checking this machine…</p>
       ) : (
@@ -349,7 +351,7 @@ function AuthStep({
         <ol className="mt-4 space-y-3 text-sm">
           {[
             <>Create a free account on the <a className="text-indigo-600 underline" href="https://console.anthropic.com/" target="_blank" rel="noreferrer">Anthropic Console</a> (Anthropic makes Claude).</>,
-            <>Add a payment method under <b>Billing</b>. You pay only for what you use — a daily job search usually costs a few cents.</>,
+            <>Add a payment method under <b>Billing</b>. You pay only for what you use — a daily job search usually costs well under a dollar, and the app shows what each run cost.</>,
             <>Set a <b>monthly spending limit</b> under <a className="text-indigo-600 underline" href="https://console.anthropic.com/settings/limits" target="_blank" rel="noreferrer">Limits</a> (for example $10). It&apos;s a safety net: Claude simply stops at that amount.</>,
             <>Open <a className="text-indigo-600 underline" href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer">API keys</a>, click <b>Create key</b>, and copy it (it starts with <code>sk-ant-</code>).</>,
             <>Paste it below and click <b>Save &amp; test connection</b>.</>,

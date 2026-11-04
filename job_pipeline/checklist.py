@@ -7,6 +7,7 @@ means and what the next step is. No I/O here.
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -50,6 +51,16 @@ def _parse(ts: str | None) -> datetime | None:
     return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
+def _first_sentence(text: str, limit: int = 180) -> str:
+    """First sentence of a note, cut at a word boundary with "…" if long."""
+    line = text.strip().split("\n")[0]
+    m = re.match(r"(.+?[.!?])(\s|$)", line)
+    sentence = m.group(1) if m else line
+    if len(sentence) <= limit:
+        return sentence
+    return sentence[:limit].rsplit(" ", 1)[0].rstrip(",;:") + "…"
+
+
 def reasons_and_gaps(job: Job) -> tuple[list[str], list[str]]:
     """Why it fits / what's missing. Uses the stored plain-language lists;
     falls back to the subscores for jobs scored before those existed."""
@@ -65,7 +76,7 @@ def reasons_and_gaps(job: Job) -> tuple[list[str], list[str]]:
     reasons = [f"Strong {AXIS_WORDS[k]}" for k in strong[:3]]
     gaps = [f"Weaker {AXIS_WORDS[k]}" for k in weak[:1]]
     if job.honest_bridge_notes and len(gaps) < 2:
-        gaps.append(job.honest_bridge_notes.strip().split("\n")[0][:160])
+        gaps.append(_first_sentence(job.honest_bridge_notes))
     return reasons, gaps
 
 

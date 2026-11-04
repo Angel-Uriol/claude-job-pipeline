@@ -48,7 +48,10 @@ def _job(i: int, raw: dict[str, Any]) -> Job:
         pre_filter_verdict=PreFilterVerdict.PASS, pre_filter_reason="demo",
         fit_score=raw["fit_score"], fit_verdict=Verdict(raw["verdict"]),
         fit_subscores=ScoreResult(**raw["subscores"]),
-        fit_justification=" ".join(raw["fit_reasons"]) or "Not a fit.",
+        fit_justification=(
+            "Made-up demo score. In your own profile, Claude explains here why it "
+            "scored the job this way."
+        ),
         honest_bridge_notes=raw.get("bridge") or None,
         fit_reasons=raw["fit_reasons"], fit_gaps=raw["fit_gaps"],
         is_target_company=bool(raw.get("target")), target_tier=1 if raw.get("target") else None,
