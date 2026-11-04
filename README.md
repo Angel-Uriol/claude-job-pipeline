@@ -175,11 +175,20 @@ thresholds in config. Jobs at your target companies get a tier bump (+0.3 to +0.
 
 - **Open-web search (JSearch):** add a free RapidAPI key as `JSEARCH_API_KEY` in
   `.env`. Setup writes a few queries for you, and the **Search web** button runs them.
-- **✨ Premium search (Claude in Chrome):** on the Companies step, pick companies
-  (by default the ones with no public job board) and queue a premium search:
-  Claude in Chrome browses their own careers sites like a person would. It's the
-  most thorough search, but uses many more tokens and needs permission to control
-  Chrome. Results are tagged with the profile and land in its Discover tab.
+- **✨ Premium search (Claude in Chrome), launched by the app:** on the Companies
+  step pick companies (by default the ones with no public job board) and queue a
+  premium search; then **Check Chrome connection** → **Launch** (or the ✨ button on
+  Discover). The app starts your Claude Code CLI with `--chrome`, and Claude browses
+  each company's own careers site in your Chrome, live progress on Discover
+  ("Visiting careers.nvidia.com…"). Found roles are imported into the profile
+  (skipping ones you already track) and scored. It's the most thorough search but
+  uses many more tokens. Safety: the session may only use Chrome's browsing tools —
+  no shell, no file writes, no forms or uploads — and is told never to log in,
+  apply or contact anyone.
+  *Needs:* Claude Code mode logged in, and the Claude in Chrome extension logged
+  into the same account **and attached to Claude Code**. Chrome connects the
+  extension to one app at a time, so if you use Claude Desktop: quit it, run
+  `claude` in a terminal, then `/chrome` → Reconnect.
 - **Chrome Claude (browser agent):** companies without a public board get a
   copy-paste prompt in the digest. Or use **Run Chrome Claude** in Discover to queue
   a run, which a Claude Code session with the

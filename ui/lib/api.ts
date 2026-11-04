@@ -175,6 +175,12 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ companies }),
     }),
+  chromeCheck: () =>
+    request<{ connected: boolean; detail: string }>("/api/chrome-claude/check"),
+  premiumQueue: () =>
+    request<{ pending: { id: string; ad_hoc_companies: string[] }[] }>(
+      "/api/chrome-claude/premium",
+    ),
   setupPremium: (companies: string[]) =>
     request<{ queued: { id: string }; watcher_command: string }>("/api/setup/premium", {
       method: "POST",

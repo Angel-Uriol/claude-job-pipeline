@@ -70,6 +70,8 @@ _ALLOWED_PHASES = {
     "clean-discover",
     "daily",
     "resumes",
+    # Premium search: the app launches Claude Code with Chrome (chrome_runner).
+    "premium",
 }
 
 # Resolve repo root once. Prompts dir + resume content yaml are all
@@ -923,6 +925,19 @@ def create_app(*, config_path: str | Path | None = None) -> FastAPI:
         """Queue state for the UI to poll (newest first)."""
         return {"requests": ChromeQueue().list_status()}
 
+    @app.get("/api/chrome-claude/check")
+    async def chrome_claude_check() -> dict[str, Any]:
+        """Is Claude in Chrome reachable from a Claude Code session? (~10s)"""
+        from ..chrome_runner import check_chrome
+
+        return await asyncio.to_thread(check_chrome)
+
+    @app.get("/api/chrome-claude/premium")
+    async def chrome_claude_premium_queue() -> dict[str, Any]:
+        """Premium searches queued for the active profile."""
+        profile = None if paths.pinned_profile_dir() else paths.active_slug()
+        return {"pending": ChromeQueue().pending_for(profile)}
+
     @app.post("/api/chrome-claude/parse")
     async def chrome_claude_parse(body: ChromeNLBody) -> dict[str, Any]:
         """Parse a free-text request into a PROPOSED Chrome-Claude run via
@@ -1146,6 +1161,25 @@ def _dispatch(
         out = run_handoff(cfg, store, progress=progress)
         # No store.save() — handoff only reads jobs + writes to the tracker DB.
         return out
+
+    if phase == "premium":
+        from ..chrome_runner import run_pending_premium
+
+        def _score() -> dict[str, Any]:
+            secrets = load_secrets()
+            pf = run_pre_filter(cfg, secrets, store, progress=progress,
+                                prompt_path=_PROMPTS_DIR / "pre_filter.txt")
+            store.save()
+            df = run_deep_fit(cfg, secrets, store, progress=progress,
+                              prompt_path=_PROMPTS_DIR / "deep_fit.txt")
+            store.save()
+            return {"pre_filter": pf, "deep_fit": df}
+
+        def _say(line: str) -> None:
+            progress(ProgressEvent(phase="premium", message=line))
+
+        profile = None if paths.pinned_profile_dir() else paths.active_slug()
+        return run_pending_premium(cfg, store, profile=profile, progress=_say, score=_score)
 
     if phase == "clean-discover":
         out = run_clean_discover(cfg, store, progress=progress)

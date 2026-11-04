@@ -147,6 +147,41 @@ class ChromeQueue:
                 return rec
         return None
 
+    def pending_for(
+        self, profile: str | None, *, premium_only: bool = True
+    ) -> list[dict[str, Any]]:
+        """Pending requests belonging to `profile` (oldest first)."""
+        self._ensure_dirs()
+        out: list[dict[str, Any]] = []
+        for path in sorted(self.pending_dir.glob("*.json"), key=lambda p: p.name):
+            rec = self._read(path)
+            if (rec is not None and rec.get("status") == STATUS_PENDING
+                    and rec.get("profile") == profile
+                    and (rec.get("premium") or not premium_only)):
+                out.append(rec)
+        return out
+
+    def claim(self, rid: str) -> dict[str, Any] | None:
+        """Mark one specific pending request running (None if it isn't pending)."""
+        path = self.pending_dir / f"{rid}.json"
+        rec = self._read(path) if path.exists() else None
+        if rec is None or rec.get("status") != STATUS_PENDING:
+            return None
+        rec["status"] = STATUS_RUNNING
+        rec["started_at"] = _now()
+        self._write_pending(rec)
+        return rec
+
+    def release(self, rid: str) -> dict[str, Any] | None:
+        """Put a running request back to pending (e.g. Chrome wasn't connected)."""
+        path = self.pending_dir / f"{rid}.json"
+        rec = self._read(path) if path.exists() else None
+        if rec is None:
+            return None
+        rec["status"], rec["started_at"] = STATUS_PENDING, None
+        self._write_pending(rec)
+        return rec
+
     def finish(
         self, rid: str, *, summary: dict[str, Any] | str | None = None
     ) -> dict[str, Any]:

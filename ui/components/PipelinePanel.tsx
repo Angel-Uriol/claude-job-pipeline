@@ -46,6 +46,24 @@ export default function PipelinePanel({ running, lastEvent, onRun }: Props) {
 
         <button
           type="button"
+          onClick={() => {
+            if (
+              window.confirm(
+                "Run your queued ✨ premium searches now?\n\nClaude will control Chrome on this computer to browse the companies' careers sites (read-only — it never logs in, applies or fills forms). It uses many more tokens than a regular scrape and can take several minutes per company.",
+              )
+            ) {
+              onRun("premium");
+            }
+          }}
+          disabled={isBusy}
+          title="Run queued premium searches: Claude in Chrome browses companies' own careers sites. Queue companies on Setup → Companies."
+          className="rounded-lg border border-fuchsia-300 bg-fuchsia-50 px-4 py-2 text-sm font-semibold text-fuchsia-700 transition hover:bg-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-fuchsia-500/30 dark:bg-fuchsia-500/15 dark:text-fuchsia-300 dark:hover:bg-fuchsia-500/25"
+        >
+          ✨ Premium search
+        </button>
+
+        <button
+          type="button"
           onClick={() => onRun("handoff")}
           disabled={isBusy}
           title="Push apply/consider jobs (+ their tailored resumes) into the Track tab. Discarded jobs are excluded."

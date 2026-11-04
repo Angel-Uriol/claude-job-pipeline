@@ -672,6 +672,9 @@ function PremiumSearch({
   );
   const [queued, setQueued] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [chrome, setChrome] = useState<{ connected: boolean; detail: string } | null>(null);
+  const [launched, setLaunched] = useState(false);
 
   const toggle = (name: string) =>
     setPicked((p) => (p.includes(name) ? p.filter((x) => x !== name) : [...p, name]));
@@ -695,8 +698,8 @@ function PremiumSearch({
         ✨ Premium search <span className="rounded bg-violet-200/70 px-1.5 text-[10px] dark:bg-violet-500/20">optional</span>
       </div>
       <p className="mt-1 text-xs text-violet-900/80 dark:text-violet-100/80">
-        Claude in Chrome opens each company&apos;s own careers site and searches it like a person
-        would — the most thorough and up-to-date search, and the only way to cover companies without
+        The app launches Claude, which opens each company&apos;s own careers site in your Chrome and
+        searches it like a person would (read-only: it never logs in, applies or fills forms) — the most thorough and up-to-date search, and the only way to cover companies without
         a public job board. It <b>uses many more tokens</b> than the regular scrape and needs
         <b> permission to control Chrome on your computer</b> (the Claude in Chrome extension).
       </p>
@@ -721,13 +724,58 @@ function PremiumSearch({
         })}
       </div>
       {queued ? (
-        <div className="mt-3 space-y-2 text-xs text-violet-900 dark:text-violet-100">
-          <p>
-            ✓ Queued. To run it: open Claude Code (with the Claude in Chrome extension connected) in
-            this project folder and paste:
-          </p>
-          <code className="block select-all break-all rounded bg-white/70 p-2 dark:bg-slate-900">{queued}</code>
-          <p>Found jobs are scored and added to this profile&apos;s Discover tab automatically.</p>
+        <div className="mt-3 space-y-3 text-xs text-violet-900 dark:text-violet-100">
+          <p>✓ Queued. The app can run it for you — Claude opens and controls Chrome:</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={checking}
+              onClick={async () => {
+                setChecking(true);
+                try {
+                  setChrome(await api.chromeCheck());
+                } catch (e) {
+                  onError(errText(e));
+                } finally {
+                  setChecking(false);
+                }
+              }}
+              className="rounded-lg border border-violet-400 px-3 py-1.5 font-semibold transition hover:bg-violet-100 disabled:opacity-50 dark:hover:bg-violet-500/20"
+            >
+              {checking ? "Checking Chrome… (~10s)" : "1 · Check Chrome connection"}
+            </button>
+            <button
+              type="button"
+              disabled={!chrome?.connected || launched}
+              onClick={async () => {
+                try {
+                  await api.runPhase("premium");
+                  setLaunched(true);
+                } catch (e) {
+                  onError(errText(e));
+                }
+              }}
+              className="rounded-lg bg-violet-600 px-3 py-1.5 font-semibold text-white transition hover:bg-violet-700 disabled:opacity-40"
+            >
+              {launched ? "Running — watch Discover" : "2 · ▶ Launch premium search"}
+            </button>
+          </div>
+          {chrome && (
+            <p className={chrome.connected ? "text-emerald-700 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300"}>
+              {chrome.connected ? "✓ " : "✗ "}
+              {chrome.detail}
+            </p>
+          )}
+          {launched && (
+            <p>
+              Progress shows on <Link href="/" className="underline">Discover</Link> (“Visiting
+              careers.…”). Found jobs are imported into this profile and scored automatically.
+            </p>
+          )}
+          <details>
+            <summary className="cursor-pointer opacity-70">Or run it from your own Claude Code session</summary>
+            <code className="mt-1 block select-all break-all rounded bg-white/70 p-2 dark:bg-slate-900">{queued}</code>
+          </details>
         </div>
       ) : (
         <button
