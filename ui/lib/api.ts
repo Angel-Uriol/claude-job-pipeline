@@ -37,6 +37,9 @@ import type {
   TrackerJobsResponse,
   TrackerStats,
   TodayResponse,
+  CoverLetterResult,
+  ResumeChanges,
+  PrintSpec,
 } from "./types";
 
 /**
@@ -290,6 +293,17 @@ export const api = {
     }),
 
   getTaskStatus: () => request<TaskStatusResponse>("/api/tasks/current"),
+
+  // --- cover letters, review changes, print view ---
+  coverLetter: (key: string) =>
+    request<CoverLetterResult>(`/api/jobs/${encodeURIComponent(key)}/cover-letter`, { method: "POST" }),
+  coverLetterUrl: (key: string) =>
+    `${API_BASE}/api/jobs/${encodeURIComponent(key)}/cover-letter/download`,
+  resumeChanges: (key: string) =>
+    request<ResumeChanges>(`/api/jobs/${encodeURIComponent(key)}/resume/changes`),
+  resumeOriginal: (key: string) =>
+    request<{ path: string }>(`/api/jobs/${encodeURIComponent(key)}/resume/original`, { method: "POST" }),
+  resumeSpec: (key: string) => request<PrintSpec>(`/api/jobs/${encodeURIComponent(key)}/resume/spec`),
 
   // --- Today screen + apply checklist ---
   today: () => request<TodayResponse>("/api/today"),

@@ -103,6 +103,8 @@ export interface TrackedJob {
   added_at: string | null;
   hidden: number; // 0 | 1
   resume_file_path: string | null;
+  follow_up_at?: string | null;   // when to nudge the recruiter; null = done
+  cover_letter_path?: string | null;
 }
 
 export interface TrackerJobsResponse {
@@ -167,6 +169,7 @@ export interface Job {
   cover_letter_path?: string | null;
   apply_opened_at?: string | null;
   follow_up_at?: string | null;
+  checklist?: ChecklistStep[];
   honest_bridge_notes: string | null;
 
   // target-company overlay (your target_companies.yaml)
@@ -515,4 +518,43 @@ export interface TodayResponse {
   total_open: number;
   applied_count: number;
   budget: BudgetStatus | null;
+}
+
+// ===== cover letters + review changes + print =====
+
+export interface CoverLetterResult {
+  path: string;
+  warnings: string[];
+}
+
+export interface BulletChange {
+  id: string;
+  where: string;
+  before: string;
+  after: string;
+  changed: boolean;
+  numbers_kept: boolean;
+}
+
+export interface ResumeChanges {
+  tailored: boolean;
+  changes: {
+    summary: { before: string; after: string; changed: boolean };
+    bullets: BulletChange[];
+    skills: { before: string[]; after: string[] };
+  } | null;
+}
+
+export interface PrintSpec {
+  company: string;
+  title: string;
+  resume: Record<string, unknown>;
+  cover_letter: {
+    header: { name: string; email: string; phone?: string; linkedin?: string; location?: string };
+    date: string;
+    title: string;
+    greeting: string;
+    paragraphs: string[];
+    closing: string;
+  } | null;
 }

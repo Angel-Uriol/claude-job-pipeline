@@ -492,6 +492,8 @@ function TrackCard({
           </div>
         </button>
 
+        {job.status === "applied" && <FollowUpChip job={job} />}
+
         <select
           value={job.status}
           onChange={(e) => onStatus(e.target.value as TrackStatus)}
@@ -583,6 +585,34 @@ function Badge({ children }: { children: React.ReactNode }) {
   return (
     <span className="rounded bg-slate-100 px-1.5 py-0.5 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
       {children}
+    </span>
+  );
+}
+
+// Follow-up nudge for an applied job: due date + "Done" / "+3 days".
+function FollowUpChip({ job }: { job: TrackedJob }) {
+  const [when, setWhen] = useState<string | null>(job.follow_up_at ?? null);
+  const [busy, setBusy] = useState(false);
+  const [now] = useState(() => Date.now()); // render must stay pure
+  if (!when) return <span className="text-[11px] text-emerald-600 dark:text-emerald-400">followed up ✓</span>;
+  const due = new Date(when);
+  const overdue = due.getTime() <= now;
+  const act = async (action: "done" | "snooze") => {
+    setBusy(true);
+    try {
+      const r = await api.followUp({ action, days: 3, tracker_id: job.id });
+      setWhen(r.follow_up_at);
+    } catch {
+      /* leave as is */
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <span className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] ${overdue ? "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200" : "text-slate-500"}`}>
+      {overdue ? "Follow up now" : `Follow up ${due.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`}
+      <button type="button" disabled={busy} onClick={() => act("done")} className="underline">done</button>
+      <button type="button" disabled={busy} onClick={() => act("snooze")} className="underline">+3d</button>
     </span>
   );
 }

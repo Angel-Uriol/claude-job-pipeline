@@ -49,6 +49,7 @@ from ..runner import (
     run_tracker,
 )
 from ..store import JobStore
+from .document_routes import register_document_routes
 from .events import EventBus, PipelineState, event_to_dict
 from .profile_routes import register_profile_routes
 from .research_routes import register_research_routes
@@ -218,6 +219,8 @@ def create_app(*, config_path: str | Path | None = None) -> FastAPI:
     register_research_routes(app)
     # Today screen + apply checklist actions.
     register_today_routes(app)
+    # Cover letters, review changes, print view.
+    register_document_routes(app)
 
     @app.exception_handler(FileNotFoundError)
     async def _not_configured(_request: Request, exc: FileNotFoundError) -> JSONResponse:
@@ -1360,6 +1363,10 @@ def _job_to_ui(j: Job, cfg: Config | None = None) -> dict[str, Any]:
     # Compute days_since_posted for the UI's color-coded relative date.
     d["days_since_posted"] = _days_since_posted(j)
     d["location_kind"] = _location_kind(j.location, cfg) if cfg else "unknown"
+    # Apply checklist (job_pipeline/checklist.py) for the drawer.
+    from ..checklist import checklist
+
+    d["checklist"] = checklist(j)
     return d
 
 

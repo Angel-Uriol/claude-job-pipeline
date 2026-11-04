@@ -22,6 +22,7 @@ import re
 import subprocess
 import tempfile
 from pathlib import Path
+from typing import Any
 
 from ..models import Job
 from .content_loader import ResumeContent
@@ -74,10 +75,13 @@ def generate_resume(
 
     family = family or classify_family(job)
     spec = build_resume_spec(job, content, family)
+    original_spec = spec
+    tailored = False
 
     if tailorer is not None:
         try:
             spec = tailorer.tailor_spec(spec, job)
+            tailored = True
             log.info("Tailored resume spec for %s / %s via Claude", job.company, job.title)
         except Exception as e:  # noqa: BLE001 — tailoring is best-effort
             log.warning(
@@ -135,7 +139,60 @@ def generate_resume(
         if os.environ.get("KEEP_RESUME_SPEC") != "1":
             spec_path.unlink(missing_ok=True)
 
+    # Sidecars next to the .docx (additive, small JSON):
+    #   .spec.json    — exactly what was rendered (the print / "Save as PDF" page)
+    #   .changes.json — what Claude reworded vs. your original ("Review changes")
+    write_sidecars(output_path, spec, original_spec if tailored else None)
     return output_path
+
+
+def sidecar(docx_path: str | Path, kind: str) -> Path:
+    """`Name_Company_Family.docx` → `Name_Company_Family.<kind>.json`."""
+    p = Path(docx_path)
+    return p.with_name(f"{p.stem}.{kind}.json")
+
+
+def write_sidecars(output_path: Path, spec: dict[str, Any],
+                   original: dict[str, Any] | None) -> None:
+    sidecar(output_path, "spec").write_text(
+        json.dumps(spec, indent=2, ensure_ascii=False), encoding="utf-8")
+    changes = sidecar(output_path, "changes")
+    if original is None:
+        changes.unlink(missing_ok=True)  # an untailored re-render has no changes
+        return
+    changes.write_text(json.dumps(diff_specs(original, spec), indent=2, ensure_ascii=False),
+                       encoding="utf-8")
+
+
+_NUMBER = re.compile(r"\d[\d,.]*%?\+?")
+
+
+def diff_specs(original: dict[str, Any], tailored: dict[str, Any]) -> dict[str, Any]:
+    """Side-by-side of what tailoring changed: summary, bullets, skills.
+
+    `numbers_kept` is False when a bullet's numbers differ — the tailor prompt
+    forbids that, so the UI shows it as a warning."""
+    def bullets(spec: dict[str, Any]) -> dict[str, tuple[str, str]]:
+        return {b["id"]: (exp.get("company") or exp.get("title") or "", b["text"])
+                for exp in spec.get("experiences", []) for b in exp.get("bullets", [])}
+
+    before, after = bullets(original), bullets(tailored)
+    rows = []
+    for bid, (where, text) in before.items():
+        new = after.get(bid, (where, text))[1]
+        rows.append({"id": bid, "where": where, "before": text, "after": new,
+                     "changed": new != text,
+                     "numbers_kept": sorted(_NUMBER.findall(text)) == sorted(_NUMBER.findall(new))})
+
+    def skills(spec: dict[str, Any]) -> list[str]:
+        return [i for g in spec.get("skills", []) for i in g.get("items", [])]
+
+    return {
+        "summary": {"before": original.get("summary", ""), "after": tailored.get("summary", ""),
+                    "changed": original.get("summary") != tailored.get("summary")},
+        "bullets": rows,
+        "skills": {"before": skills(original), "after": skills(tailored)},
+    }
 
 
 def _output_filename(job: Job, family: FamilyConfig, candidate_name: str) -> str:

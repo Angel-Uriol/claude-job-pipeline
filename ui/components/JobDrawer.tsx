@@ -6,6 +6,7 @@
 
 import { useState } from "react";
 
+import ApplyKit from "@/components/ApplyKit";
 import Explain from "@/components/Explain";
 import { ApiError, api } from "@/lib/api";
 import { AXIS_LABELS, VERDICT_LABELS, scoreLabel } from "@/lib/plain";
@@ -129,6 +130,8 @@ export default function JobDrawer({
             <Stat label="Suggestion" value={job.fit_verdict ? VERDICT_LABELS[job.fit_verdict] ?? job.fit_verdict : "—"} />
             <Stat label="Source" value={job.source} />
           </div>
+
+          <ApplyKit job={job} onUpdate={onUpdate} />
 
           {!!(job.fit_reasons?.length || job.fit_gaps?.length) && (
             <div className="grid gap-3 sm:grid-cols-2">
@@ -265,6 +268,10 @@ export default function JobDrawer({
               target="_blank"
               rel="noopener noreferrer"
               className={SECONDARY_BTN}
+              onClick={() => {
+                // Checklist: "Open the application page" — record it, quietly.
+                api.markOpened(job.key).then(() => api.getJob(job.key)).then(onUpdate).catch(() => {});
+              }}
             >
               ↗ Open posting
             </a>
