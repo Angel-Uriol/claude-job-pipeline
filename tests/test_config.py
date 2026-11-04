@@ -63,7 +63,9 @@ def test_minimal_config_gets_defaults(tmp_path: Path) -> None:
     p = tmp_path / "c.yaml"
     p.write_text("profile:\n  name: A\n  email: a@example.com\nscrapers: {}\n", encoding="utf-8")
     cfg = load_config(p)
-    assert cfg.tracker.db_path == "data/tracker.db"
+    # Relative paths are anchored to the config's own folder (its profile).
+    assert cfg.tracker.db_path == str((tmp_path / "data" / "tracker.db").resolve())
+    assert cfg.paths.jobs_json == str((tmp_path / "data" / "jobs.json").resolve())
     assert cfg.filters.allow_remote is True
     assert cfg.scoring.deep_fit_model.startswith("claude-")
 

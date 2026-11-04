@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -495,6 +496,65 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     return run_doctor()
 
 
+def cmd_profiles(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from . import profiles
+
+    try:
+        if args.profiles_cmd == "list":
+            items = profiles.list_profiles()
+            if not items:
+                print("No profiles yet. Create one: job-pipeline profiles create \"Your name\"")
+            for pr in items:
+                status = "configured" if pr["configured"] else "setup not finished"
+                print(f"{'*' if pr['active'] else ' '} {pr['slug']:<20} {pr['name']:<24} "
+                      f"{status}, {pr['applied']} applied / {pr['tracked_jobs']} tracked")
+        elif args.profiles_cmd == "create":
+            pr = profiles.create(args.name)
+            print(f"Created and switched to {pr['slug']!r}. Next: job-pipeline setup")
+        elif args.profiles_cmd == "use":
+            pr = profiles.activate(args.slug)
+            print(f"Active profile: {pr['name']} ({pr['slug']})")
+        elif args.profiles_cmd == "export":
+            slug = args.slug or paths.active_slug()
+            bundle = profiles.export_profile(slug, include_history=not args.no_history)
+            out = Path(args.output or f"{profiles.slugify(bundle['name'])}-profile.json")
+            out.write_text(_json.dumps(bundle, indent=2, ensure_ascii=False), encoding="utf-8")
+            print(f"Exported {bundle['name']!r} → {out}")
+        elif args.profiles_cmd == "import":
+            data = profiles.load_import_file(args.file)
+            if profiles.is_bundle(data):
+                pr = profiles.import_bundle(data, name=args.name)
+                print(f"Restored {pr['name']!r} as {pr['slug']!r} "
+                      f"({pr['restored']['jobs']} tracked jobs) and switched to it.")
+            else:
+                from .config import LLMSettings
+                from .llm import LLMError, build_llm
+
+                try:
+                    llm = build_llm()
+                except LLMError as e:
+                    print(f"Importing a free-form JSON file needs Claude: {e}")
+                    return 1
+                pr = profiles.smart_import(data, llm=llm, model=LLMSettings().smart_model,
+                                           name=args.name)
+                print(f"Created {pr['name']!r} from your file. "
+                      "Run `job-pipeline setup` to fill in what's missing.")
+        elif args.profiles_cmd == "delete":
+            if not args.yes and input(
+                f"Delete profile {args.slug!r} and ALL its data? Type the name to confirm: "
+            ).strip() != args.slug:
+                print("Not deleted.")
+                return 1
+            profiles.delete(args.slug)
+            print(f"Deleted {args.slug!r}.")
+    except profiles.ProfileError as e:
+        print(f"Error: {e}")
+        return 1
+    return 0
+
+
 # --- parser ---------------------------------------------------------------
 
 
@@ -524,6 +584,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="enable debug logging",
     )
+    parser.add_argument(
+        "--profile",
+        default=None,
+        metavar="NAME",
+        help="run against this profile instead of the active one (see `profiles list`)",
+    )
 
     sub = parser.add_subparsers(dest="cmd", required=True, metavar="<command>")
 
@@ -540,6 +606,26 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("doctor", help="check Python, Node, Claude auth and your profile")
     p.set_defaults(func=cmd_doctor)
+
+    # profiles — one complete memory per person
+    p = sub.add_parser("profiles", help="list / create / switch / export / import profiles")
+    psub = p.add_subparsers(dest="profiles_cmd", required=True, metavar="<action>")
+    psub.add_parser("list", help="show all profiles (* = active)")
+    q = psub.add_parser("create", help="create a profile and switch to it")
+    q.add_argument("name")
+    q = psub.add_parser("use", help="switch the active profile")
+    q.add_argument("slug")
+    q = psub.add_parser("export", help="write a profile to a JSON file")
+    q.add_argument("slug", nargs="?", default=None, help="default: the active profile")
+    q.add_argument("-o", "--output", default=None, help="file path (default: <name>-profile.json)")
+    q.add_argument("--no-history", action="store_true", help="leave out the applied-jobs history")
+    q = psub.add_parser("import", help="create a profile from a JSON file")
+    q.add_argument("file")
+    q.add_argument("--name", default=None, help="name for the new profile")
+    q = psub.add_parser("delete", help="delete a profile and all its data")
+    q.add_argument("slug")
+    q.add_argument("--yes", action="store_true", help="don't ask for confirmation")
+    p.set_defaults(func=cmd_profiles)
 
     # scrape
     p = sub.add_parser("scrape", help="pull jobs from configured Greenhouse/Lever/Ashby boards")
@@ -637,6 +723,18 @@ def main(argv: list[str] | None = None) -> int:
     """Parse args and dispatch to the chosen subcommand."""
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.profile:
+        # Pin one profile for this command only.
+        try:
+            os.environ["JOB_PIPELINE_PROFILE_DIR"] = str(paths.profile_dir_for(args.profile))
+        except ValueError as e:
+            parser.error(str(e))
+    else:
+        from .profiles import ensure_active
+
+        # Moves an old single `profile/` folder into profiles/. The `profiles`
+        # command manages folders itself, so it doesn't get an empty default.
+        ensure_active(create_default=args.cmd != "profiles")
     handler: CommandHandler = args.func
     return handler(args)
 

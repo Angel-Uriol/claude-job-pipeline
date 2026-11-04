@@ -404,3 +404,27 @@ export interface AuthCheck {
   ok: boolean;
   detail: string;
 }
+
+// ===== profiles (one complete memory per person) =====
+
+export interface ProfileSummary {
+  slug: string;
+  name: string;
+  active: boolean;
+  configured: boolean;
+  chat_started: boolean;
+  tracked_jobs: number;
+  applied: number;
+  created_at: string | null;
+}
+
+export interface ProfilesResponse {
+  profiles: ProfileSummary[];
+  active: string | null;
+  switching_enabled: boolean;
+}
+
+export interface ProfileImportResult extends ProfileSummary {
+  mode: "restore" | "smart";
+  restored?: { jobs: number; contacts: number };
+}

@@ -87,11 +87,12 @@ export default function ProfileChat({
     } else if (phase === "market1" || phase === "market2") {
       autoRan.current = key;
       void run("scanning", api.setupMarket);
-    } else if (phase.startsWith("round") && last?.role === "user") {
+    } else if (phase.startsWith("round") && (last?.role === "user" || last?.kind === "note")) {
+      // Resume a round after a reload, or start one after an import / status note.
       autoRan.current = key;
       void run("thinking", () => api.setupInterview(""));
     }
-  }, [busy, phase, interview.messages.length, last?.role, run]);
+  }, [busy, phase, interview.messages.length, last?.role, last?.kind, run]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // Rotate the scanning status lines.

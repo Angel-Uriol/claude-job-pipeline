@@ -347,7 +347,9 @@ class Config(BaseModel):
 def load_config(path: str | Path | None = None) -> Config:
     """Read, parse, and validate the profile's `config.yaml`.
 
-    `path` defaults to `profile/config.yaml` (see `paths.config_path`).
+    `path` defaults to the active profile's config (see `paths.config_path`).
+    Relative paths inside it (`paths.*`, `tracker.db_path`) resolve against
+    the config file's own folder, so every profile keeps its own history.
 
     Raises:
         FileNotFoundError: if the file doesn't exist at `path`.
@@ -365,7 +367,22 @@ def load_config(path: str | Path | None = None) -> Config:
         raw: Any = yaml.safe_load(f)
     if not isinstance(raw, dict):
         raise ValueError(f"{p} did not parse as a YAML mapping")
-    return Config(**raw)
+    return anchor_paths(Config(**raw), p.parent)
+
+
+def anchor_paths(cfg: Config, base: Path) -> Config:
+    """Make the config's relative file paths absolute under `base` (in place)."""
+
+    def fix(value: str) -> str:
+        q = Path(value).expanduser()
+        return str(q if q.is_absolute() else (base / q).resolve())
+
+    cfg.paths.jobs_json = fix(cfg.paths.jobs_json)
+    cfg.paths.tracker_xlsx = fix(cfg.paths.tracker_xlsx)
+    cfg.paths.digests_dir = fix(cfg.paths.digests_dir)
+    cfg.paths.resumes_dir = fix(cfg.paths.resumes_dir)
+    cfg.tracker.db_path = fix(cfg.tracker.db_path)
+    return cfg
 
 
 def load_secrets() -> Secrets:

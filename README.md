@@ -92,13 +92,13 @@ call, so most postings never cost anything. Change the models in `profile/config
 ## What lives where
 
 ```
-profile/                    YOUR data (gitignored) — written by Setup, edit freely
+profiles/<name>/            ONE PERSON'S data (gitignored) — written by Setup, edit freely
   config.yaml               profile + scrapers + filters + models
   resume_content.yaml       every bullet, summary, job, degree (source of all resumes)
   target_companies.yaml     companies to boost, by tier
-.env                        API key + auth mode (gitignored)
-data/                       jobs.json, tracker.db, digests (gitignored)
-outputs/resumes/            generated .docx files (gitignored)
+  data/                     jobs.json, tracker.db, digests
+  outputs/resumes/          generated .docx files
+.env                        API key + auth mode (gitignored, shared by all profiles)
 
 examples/profile/           a complete fictional profile — read it to see every option
 prompts/                    the prompt templates (Jinja, rendered from your profile)
@@ -113,6 +113,34 @@ job_pipeline/
   ui/                       FastAPI backend (incl. setup_routes.py)
 ui/                         Next.js frontend: Discover, Track, Setup
 ```
+
+## Profiles — one complete memory per person
+
+Several people (or several job searches) can share one install. Each **profile**
+is its own folder under `profiles/` with that person's config, resume, target
+companies, setup chat **and history** — Discover inbox, tracker of what they
+applied to, digests and generated resumes. Nothing is shared between profiles
+except your Claude connection.
+
+- **Switch** from the chip in the top bar, or manage everything on the
+  **Profiles** page (create, rename, delete).
+- **Export** a profile to one JSON file (optionally with its applied-jobs
+  history) and **import** it on another machine — it's restored exactly.
+- **Import any other JSON about a person** (a resume export, notes, an old
+  context file): Claude reads it and pre-fills a new profile's setup chat, which
+  then only asks about what's missing.
+
+```bash
+uv run job-pipeline profiles list
+uv run job-pipeline profiles create "Sam Lee"
+uv run job-pipeline profiles use sam-lee
+uv run job-pipeline profiles export sam-lee -o sam.json
+uv run job-pipeline profiles import sam.json
+uv run job-pipeline --profile sam-lee daily      # run one command as Sam
+```
+
+Upgrading from a version with a single `profile/` folder? It's moved into
+`profiles/` automatically on first start.
 
 ## Already applied? It won't come back
 

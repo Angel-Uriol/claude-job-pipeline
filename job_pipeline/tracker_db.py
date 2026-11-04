@@ -600,3 +600,52 @@ def insert_jobs(
     finally:
         conn.close()
     return {"batch": batch, "inserted": inserted, "resumes": resumes, "skipped": skipped}
+
+
+# --- export / restore (profile import-export) -----------------------------
+
+
+def export_rows(cfg: Config) -> dict[str, list[dict[str, Any]]]:
+    """Every tracker row (hidden ones too) as plain dicts, per table.
+
+    Resume rows are exported WITHOUT their file paths' contents — the .docx
+    files are regenerated on demand; what must travel is the history (what
+    you applied to, its status and notes), so imports never resurface it.
+    """
+    if not db_exists(cfg):
+        return {"jobs": [], "contacts": []}
+    conn = _open(cfg)
+    try:
+        return {
+            "jobs": [dict(r) for r in conn.execute("SELECT * FROM jobs")],
+            "contacts": [dict(r) for r in conn.execute("SELECT * FROM contacts")],
+        }
+    finally:
+        conn.close()
+
+
+def restore_rows(cfg: Config, data: dict[str, list[dict[str, Any]]]) -> dict[str, int]:
+    """Insert exported rows as-is (ids, statuses, dates kept). Rows whose id
+    already exists are skipped. Unknown columns are ignored."""
+    conn = _open(cfg)
+    counts = {"jobs": 0, "contacts": 0}
+    try:
+        for table in ("jobs", "contacts"):
+            cols = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+            for row in data.get(table) or []:
+                keep = {k: v for k, v in row.items() if k in cols}
+                if table == "contacts":
+                    keep.pop("id", None)  # autoincrement — let SQLite assign
+                if not keep:
+                    continue
+                names = ", ".join(keep)
+                marks = ", ".join(["?"] * len(keep))
+                cur = conn.execute(
+                    f"INSERT OR IGNORE INTO {table} ({names}) VALUES ({marks})",
+                    tuple(keep.values()),
+                )
+                counts[table] += cur.rowcount
+        conn.commit()
+    finally:
+        conn.close()
+    return counts

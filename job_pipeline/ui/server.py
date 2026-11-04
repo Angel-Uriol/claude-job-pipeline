@@ -34,6 +34,7 @@ from ..config import Config, load_config, load_secrets
 from ..handoff import run_handoff
 from ..llm import LLMError, build_llm, llm_available
 from ..models import Job, Status
+from ..profiles import ensure_active
 from ..prompts import render_prompt
 from ..resume import build_resume_tailorer, generate_resume, load_resume_content
 from ..runner import (
@@ -49,6 +50,7 @@ from ..runner import (
 )
 from ..store import JobStore
 from .events import EventBus, PipelineState, event_to_dict
+from .profile_routes import register_profile_routes
 from .setup_routes import register_setup_routes
 
 log = logging.getLogger(__name__)
@@ -157,7 +159,11 @@ def create_app(*, config_path: str | Path | None = None) -> FastAPI:
     Factored as a function so tests can pass a stub config path. Default is
     the profile's config (`profile/config.yaml`), which the Setup page writes.
     """
-    config_path = str(config_path) if config_path is not None else str(paths.config_path())
+    # None = "the active profile's config", re-resolved on every request so
+    # switching profiles takes effect immediately (see profiles.py).
+    config_path = str(config_path) if config_path is not None else None
+    if config_path is None:
+        ensure_active()
 
     state = PipelineState()
     bus = EventBus()
@@ -196,6 +202,8 @@ def create_app(*, config_path: str | Path | None = None) -> FastAPI:
 
     # First-run Setup page API (works before a profile exists).
     register_setup_routes(app)
+    # Profiles: one complete memory per person (switch / import / export).
+    register_profile_routes(app)
 
     @app.exception_handler(FileNotFoundError)
     async def _not_configured(_request: Request, exc: FileNotFoundError) -> JSONResponse:
@@ -520,7 +528,9 @@ def create_app(*, config_path: str | Path | None = None) -> FastAPI:
             )
 
         asyncio.create_task(
-            _run_pipeline_task(phase, state, bus, lock, config_path, resume_filter)
+            # Pin the profile for the whole run, even if you switch mid-run.
+            _run_pipeline_task(phase, state, bus, lock, config_path or str(paths.config_path()),
+                               resume_filter)
         )
         # `current` is the only task id we ever return — there's only
         # one pipeline at a time and we want polling to be trivial.

@@ -4,6 +4,7 @@
 # YOUR data — the profile folder and everything the pipeline produces.
 # (examples/profile/ is the committed, fictional template.)
 /profile/
+/profiles/
 /data/
 /outputs/
 *.bak

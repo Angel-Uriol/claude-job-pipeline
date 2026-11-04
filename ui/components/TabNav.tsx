@@ -1,12 +1,13 @@
 // Global top nav: Discover (the discovery/scoring inbox), Track (the
 // application tracker) and Setup (connect Claude + the profile
-// questionnaire) — plus the theme toggle.
+// questionnaire) — plus the profile switcher and the theme toggle.
 
 "use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import ProfileSwitcher from "./ProfileSwitcher";
 import ThemeToggle from "./ThemeToggle";
 
 const TABS: { href: string; label: string }[] = [
@@ -43,7 +44,10 @@ export default function TabNav() {
             );
           })}
         </div>
-        <ThemeToggle />
+        <div className="flex items-center gap-2">
+          <ProfileSwitcher />
+          <ThemeToggle />
+        </div>
       </div>
     </nav>
   );

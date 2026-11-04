@@ -9,6 +9,9 @@
 
 import type {
   AuthCheck,
+  ProfileImportResult,
+  ProfileSummary,
+  ProfilesResponse,
   AuthMode,
   ChromeClaudeParseResult,
   ChromeClaudePreview,
@@ -84,6 +87,43 @@ export { ApiError };
 
 export const api = {
   getState: () => request<StateResponse>("/api/state"),
+
+  // ===== Profiles =====
+  profiles: () => request<ProfilesResponse>("/api/profiles"),
+  createProfile: (name: string) =>
+    request<ProfileSummary>("/api/profiles", { method: "POST", body: JSON.stringify({ name }) }),
+  activateProfile: (slug: string) =>
+    request<ProfileSummary>(`/api/profiles/${encodeURIComponent(slug)}/activate`, {
+      method: "POST",
+    }),
+  renameProfile: (slug: string, name: string) =>
+    request<ProfileSummary>(`/api/profiles/${encodeURIComponent(slug)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name }),
+    }),
+  deleteProfile: (slug: string) =>
+    request<{ deleted: string }>(`/api/profiles/${encodeURIComponent(slug)}`, {
+      method: "DELETE",
+    }),
+  exportProfileUrl: (slug: string, history = true) =>
+    `${API_BASE}/api/profiles/${encodeURIComponent(slug)}/export?history=${history}`,
+  /** Multipart upload — no JSON content-type, so not via `request`. */
+  importProfile: async (file: File, name = ""): Promise<ProfileImportResult> => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("name", name);
+    const res = await fetch(`${API_BASE}/api/profiles/import`, { method: "POST", body: form });
+    if (!res.ok) {
+      let detail = res.statusText;
+      try {
+        detail = String((await res.json())?.detail ?? detail);
+      } catch {
+        /* ignore */
+      }
+      throw new ApiError(res.status, detail);
+    }
+    return res.json() as Promise<ProfileImportResult>;
+  },
 
   // ===== Setup page (first run) =====
   setupStatus: () => request<SetupStatus>("/api/setup/status"),
