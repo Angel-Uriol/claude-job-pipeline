@@ -4,6 +4,7 @@ import "./globals.css";
 import Link from "next/link";
 
 import DemoBanner from "@/components/DemoBanner";
+import Jobi from "@/components/Jobi";
 import TabNav from "@/components/TabNav";
 
 export const metadata: Metadata = {
@@ -47,6 +48,7 @@ export default function RootLayout({
           {" · "}
           <Link href="/profiles" className="underline">Profiles</Link>
         </footer>
+        <Jobi />
       </body>
     </html>
   );

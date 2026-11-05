@@ -606,3 +606,98 @@ def draft_to_profile_dict(draft: ProfileDraft) -> dict[str, Any]:
     d.setdefault("name", "")
     d.setdefault("email", "")
     return d
+
+
+# --- reopening a finished profile ------------------------------------------------
+
+REOPEN_MESSAGE = (
+    "Welcome back! Your profile is saved. What would you like to change? For example "
+    "your target roles, locations, salary, skills, or what you're looking for. When "
+    "you're done, save it again on the Review step."
+)
+
+
+def _yaml_file(path: Path) -> dict[str, Any]:
+    import yaml
+
+    if not path.exists():
+        return {}
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    return data if isinstance(data, dict) else {}
+
+
+def draft_from_saved(base: ProfileDraft | None = None,
+                     profile_dir: Path | None = None) -> tuple[ProfileDraft, dict[str, Any] | None,
+                                                            list[dict[str, Any]]]:
+    """The saved profile files → (draft, resume_content, companies).
+
+    The inverse of `draft_to_profile_dict` + the writer, so a re-save after
+    reopening keeps edits made in the forms or by Jobi. Draft-only fields
+    the files don't store (industry, search places…) come from `base`.
+    """
+    d = profile_dir or paths.profile_dir()
+    cfg = _yaml_file(d / "config.yaml")
+    prof = cfg.get("profile") or {}
+    data = (base or ProfileDraft()).model_dump(exclude_none=True)
+    data.update({k: v for k, v in prof.items() if k in ProfileDraft.model_fields})
+    filters = cfg.get("filters") or {}
+    if "location_tokens" in filters:
+        data["location_tokens"] = list(filters.get("location_tokens") or [])
+    if "allow_remote" in filters:
+        data["allow_remote"] = bool(filters["allow_remote"])
+    if filters.get("remote_excluded_tokens"):
+        data["remote_country"] = data.get("remote_country") or "US"
+    data["excluded_companies"] = list(cfg.get("excluded_companies") or [])
+    draft = ProfileDraft(**data)
+
+    resume = _yaml_file(d / "resume_content.yaml") or None
+
+    tiers = {str(t.get("name", "")).lower(): t for t in
+             (_yaml_file(d / "target_companies.yaml").get("companies") or [])}
+    companies: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    sc = cfg.get("scrapers") or {}
+    for platform in ("greenhouse", "lever", "ashby", "no_api"):
+        for c in sc.get(platform) or []:
+            name = str(c.get("name", "")).strip()
+            if not name or name.lower() in seen:
+                continue
+            seen.add(name.lower())
+            t = tiers.get(name.lower(), {})
+            row: dict[str, Any] = {"name": name, "tier": int(t.get("tier") or 2),
+                                   "aliases": list(t.get("aliases") or []), "selected": True,
+                                   "why": ""}
+            if platform == "no_api":
+                row.update(platform=None, careers_url=c.get("careers_url", ""))
+            else:
+                row.update(platform=platform, slug=c.get("slug"))
+            companies.append(row)
+    for name, t in tiers.items():
+        if name and name not in seen:
+            companies.append({"name": t.get("name", name), "tier": int(t.get("tier") or 2),
+                              "aliases": list(t.get("aliases") or []), "selected": True,
+                              "why": "", "platform": None})
+    return draft, resume, companies
+
+
+def reopen(state: InterviewState) -> InterviewState:
+    """Let the user change a finished profile by chatting again.
+
+    If the profile files exist, the draft is rebuilt from them first, so
+    changes made since setup (forms, Jobi) aren't lost on the next save.
+    """
+    if paths.is_configured():
+        draft, resume, companies = draft_from_saved(state.draft)
+        state.draft = draft
+        if resume:
+            state.resume_content = resume
+        if companies:
+            state.companies = companies
+        if state.resume_mode == "unknown":
+            state.resume_mode = "upload" if resume else "build"
+    state.phase = "round3"
+    state.done = False
+    state.round_questions = 0
+    state.say(REOPEN_MESSAGE)
+    state.save()
+    return state

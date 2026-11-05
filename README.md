@@ -55,7 +55,7 @@ Open **http://localhost:8766**. The first visit takes you to the **Setup** page:
 | Step | What happens |
 |---|---|
 | 1. Install | One click installs what's still missing: the resume renderer, and (optionally) the Claude Code CLI via Anthropic's official installer. |
-| 2. Connect Claude | Paste an Anthropic API key, **or** use your local Claude Code login (see below). |
+| 2. Connect Claude | Sign in with your Claude account (default), **or** paste an Anthropic API key under Advanced (see below). |
 | 3. Your profile | One chat with Claude, mostly tap-to-answer options. It starts with "Do you have a resume?" — upload it right in the chat, or say no and Claude builds one with you (industry, experience, projects). Then three rounds: **About you** → a live mini-pipeline (scrape the job boards → apply your location/title rules → Claude rates the top candidates → shows the best with reasons) → **What the market asks** ("3 of the 8 roles I found ask for Kafka — have you used it?") → a second, sharper scan → **Sharpen**. |
 | 4. Companies | Pre-filled with the employers found during the scans (job boards already verified); trim, add, re-check. |
 | 5. Review & save | See the three generated YAML files, then save. |
@@ -75,8 +75,8 @@ uv run job-pipeline daily     # scrape → pre-filter → deep-fit → digest �
 
 | Mode | How | Best for |
 |---|---|---|
-| **API key** (default) | Create a key at [console.anthropic.com](https://console.anthropic.com/settings/keys) and paste it on the Setup page. It's saved to `.env`, which is gitignored. | Everyone. Pay-as-you-go. |
-| **Claude Code login** | Click **Install** on step 1 (or install [Claude Code](https://claude.com/claude-code) yourself), then **Log in with Claude**: your browser opens for the Claude login, and when it says "You're all set" the page picks up the token by itself (it runs `claude setup-token` for you and saves the token to `.env`). The app drives that CLI through the [Claude Agent SDK](https://docs.claude.com/en/docs/agent-sdk/overview), so you don't paste a key. | Running the tool for yourself, on your own machine. |
+| **Sign in with Claude** (default) | Click **Install** on step 1 (or install [Claude Code](https://claude.com/claude-code) yourself), then **Log in with Claude**: your browser opens for the Claude login, and when it says "You're all set" the page picks up the token by itself (it runs `claude setup-token` for you and saves the token to `.env`). The app drives that CLI through the [Claude Agent SDK](https://docs.claude.com/en/docs/agent-sdk/overview), so you don't paste a key. | Claude Pro/Max users running the tool for themselves, on their own machine. No extra bill; counts against your plan's limits. |
+| **API key** (Advanced) | Create a key at [console.anthropic.com](https://console.anthropic.com/settings/keys) and paste it on the Setup page. It's saved to `.env`, which is gitignored. | No Claude plan, separate billing, or sharing the app with others. Pay-as-you-go. |
 
 > **About Claude Code login mode:** Anthropic's terms ask third-party tools to use
 > API keys rather than claude.ai logins. This mode exists so you can run this

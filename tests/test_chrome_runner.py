@@ -125,3 +125,21 @@ def test_premium_phase_is_allowed() -> None:
     from job_pipeline.ui.server import _ALLOWED_PHASES
 
     assert "premium" in _ALLOWED_PHASES
+
+
+def test_premium_stops_early_when_chrome_not_connected(
+        env: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The quick connection test runs first, so a full browsing session is
+    never started (or paid for) when Chrome isn't reachable."""
+    cfg, store = env
+    sessions: list[str] = []
+    monkeypatch.setattr(chrome_runner, "_require_cli", lambda s: "/bin/claude")
+    monkeypatch.setattr(chrome_runner, "check_chrome", lambda s=None: {
+        "connected": False, "detail": chrome_runner.NOT_CONNECTED_HELP})
+    monkeypatch.setattr(chrome_runner, "_session", lambda *a, **k: sessions.append("x"))
+    rec = _queue()
+    counts = chrome_runner.run_pending_premium(cfg, store, profile="angel")
+    assert counts["failed"] == 1 and counts["error_code"] == "chrome_not_connected"
+    assert sessions == []
+    # Still queued, so it runs once Chrome is reconnected.
+    assert [r["id"] for r in chrome_queue.ChromeQueue().pending_for("angel")] == [rec["id"]]

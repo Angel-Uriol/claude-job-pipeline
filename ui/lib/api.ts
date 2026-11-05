@@ -42,6 +42,9 @@ import type {
   CoverLetterResult,
   ResumeChanges,
   PrintSpec,
+  JobiApplyResult,
+  JobiEvent,
+  JobiState,
 } from "./types";
 
 /**
@@ -206,6 +209,8 @@ export const api = {
   setupCommit: () =>
     request<{ written: string[]; configured: boolean }>("/api/setup/commit", { method: "POST" }),
   setupReset: () => request<SetupInterview>("/api/setup/reset", { method: "POST" }),
+  /** Change a finished profile by chatting again (rebuilt from the saved files). */
+  setupReopen: () => request<SetupInterview>("/api/setup/interview/reopen", { method: "POST" }),
 
   /** List jobs with filter params. Maps our `FilterState` to URL query params. */
   getJobs: (filters: Partial<FilterState> = {}) => {
@@ -328,6 +333,46 @@ export const api = {
   resumeOriginal: (key: string) =>
     request<{ path: string }>(`/api/jobs/${encodeURIComponent(key)}/resume/original`, { method: "POST" }),
   resumeSpec: (key: string) => request<PrintSpec>(`/api/jobs/${encodeURIComponent(key)}/resume/spec`),
+
+  // --- Jobi, the helper chat ---
+  jobi: () => request<JobiState>("/api/jobi"),
+  jobiReset: () => request<{ ok: boolean }>("/api/jobi/reset", { method: "POST" }),
+  jobiApply: (id: string) =>
+    request<JobiApplyResult>(`/api/jobi/proposals/${encodeURIComponent(id)}/apply`, { method: "POST" }),
+  jobiDismiss: (id: string) =>
+    request<{ ok: boolean }>(`/api/jobi/proposals/${encodeURIComponent(id)}/dismiss`, { method: "POST" }),
+  /** Send a message; `onEvent` gets each streamed event (NDJSON lines). */
+  jobiChat: async (message: string, page: string, onEvent: (e: JobiEvent) => void): Promise<void> => {
+    const res = await fetch(`${API_BASE}/api/jobi/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, page }),
+    });
+    if (!res.ok || !res.body) {
+      let detail = res.statusText;
+      try {
+        detail = String((await res.json())?.detail ?? detail);
+      } catch {
+        /* ignore */
+      }
+      throw new ApiError(res.status, detail);
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let nl: number;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
+        if (line) onEvent(JSON.parse(line) as JobiEvent);
+      }
+    }
+    if (buf.trim()) onEvent(JSON.parse(buf) as JobiEvent);
+  },
 
   // --- Today screen + apply checklist ---
   today: () => request<TodayResponse>("/api/today"),

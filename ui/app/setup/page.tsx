@@ -99,6 +99,15 @@ export default function SetupPage() {
         it needs for each step.
       </p>
 
+      {status.configured && (
+        <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
+          <b>Your profile is saved.</b> You can still change it: go to step 3 and click{" "}
+          <b>Change my answers</b>, edit it as a form in{" "}
+          <Link href="/profile" className="font-semibold underline">My info</Link>, or ask <b>Jobi</b> (the helper in
+          the bottom-right corner). Saving again on step 5 keeps a backup of your current files.
+        </div>
+      )}
+
       <ol className="mt-6 flex flex-wrap gap-2">
         {STEPS.map((s) => (
           <li key={s.n}>
@@ -132,6 +141,7 @@ export default function SetupPage() {
           <AuthStep
             status={status}
             onError={setError}
+            onRefresh={load}
             onDone={async () => {
               await load();
               setStep(2);
@@ -306,12 +316,17 @@ function AuthStep({
   status,
   onError,
   onDone,
+  onRefresh,
 }: {
   status: SetupStatus;
   onError: (m: string | null) => void;
   onDone: () => void;
+  onRefresh: () => Promise<unknown>;
 }) {
-  const [mode, setMode] = useState<AuthMode>(status.auth.mode);
+  // New users start with "Sign in with Claude" (their Claude account); an
+  // Anthropic API key is the advanced option. A saved choice is kept.
+  const [mode, setMode] = useState<AuthMode>(status.auth.connected ? status.auth.mode : "claude_code");
+  const [installing, setInstalling] = useState(false);
   const [key, setKey] = useState("");
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
@@ -347,33 +362,122 @@ function AuthStep({
 
       <DemoOffer />
 
-      {mode === "api_key" ? (
-        <ol className="mt-4 space-y-3 text-sm">
-          {[
-            <>Create a free account on the <a className="text-indigo-600 underline" href="https://console.anthropic.com/" target="_blank" rel="noreferrer">Anthropic Console</a> (Anthropic makes Claude).</>,
-            <>Add a payment method under <b>Billing</b>. You pay only for what you use — a daily job search usually costs well under a dollar, and the app shows what each run cost.</>,
-            <>Set a <b>monthly spending limit</b> under <a className="text-indigo-600 underline" href="https://console.anthropic.com/settings/limits" target="_blank" rel="noreferrer">Limits</a> (for example $10). It&apos;s a safety net: Claude simply stops at that amount.</>,
-            <>Open <a className="text-indigo-600 underline" href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer">API keys</a>, click <b>Create key</b>, and copy it (it starts with <code>sk-ant-</code>).</>,
-            <>Paste it below and click <b>Save &amp; test connection</b>.</>,
-          ].map((text, i) => (
-            <li key={i} className="flex gap-3">
-              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-indigo-600 text-xs font-bold text-white">{i + 1}</span>
-              <span className="pt-0.5 text-slate-700 dark:text-slate-300">{text}</span>
+      {mode === "claude_code" ? (
+        <div className="mt-4 space-y-3 text-sm text-slate-600 dark:text-slate-300">
+          <p className="font-semibold text-slate-800 dark:text-slate-100">Sign in with your Claude account</p>
+          <p className="text-slate-500 dark:text-slate-400">
+            Uses your Claude Pro or Max plan, so there&apos;s no API key to create and nothing extra to pay.
+            Searches count against your plan&apos;s usage limits.
+          </p>
+          <ol className="space-y-3">
+            <li className="flex gap-3">
+              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-indigo-600 text-xs font-bold text-white">1</span>
+              <span className="pt-0.5">
+                {status.auth.cli.cli_found ? (
+                  <>✓ Claude Code is installed on this computer.</>
+                ) : (
+                  <>
+                    Install Claude Code (free, about a minute).{" "}
+                    <button
+                      type="button"
+                      className={`ml-1 ${BTN_GHOST} !px-3 !py-1 text-xs`}
+                      disabled={installing}
+                      onClick={async () => {
+                        setInstalling(true);
+                        onError(null);
+                        try {
+                          const r = await api.setupInstall("claude_cli");
+                          if (!r.ok) onError(`Install didn't finish: ${r.log.slice(-300)}`);
+                          await onRefresh();
+                        } catch (e) {
+                          onError(errText(e));
+                        } finally {
+                          setInstalling(false);
+                        }
+                      }}
+                    >
+                      {installing ? "Installing…" : "Install"}
+                    </button>
+                  </>
+                )}
+              </span>
             </li>
-          ))}
-        </ol>
+            <li className="flex gap-3">
+              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-indigo-600 text-xs font-bold text-white">2</span>
+              <div className="pt-0.5">
+                <p>Click <b>Log in with Claude</b>. Your browser opens; sign in and approve. This page picks it up by itself.</p>
+                <div className="mt-2">
+                  <ClaudeLogin
+                    disabled={!status.auth.cli.cli_found || busy}
+                    onError={onError}
+                    onLoggedIn={() => void connect()}
+                  />
+                </div>
+              </div>
+            </li>
+          </ol>
+          <details className="text-sm">
+            <summary className="cursor-pointer text-xs text-slate-500">Paste a token manually instead</summary>
+            <p className="mt-2 text-xs text-slate-500">
+              Run <code>claude setup-token</code> in a terminal, then paste the <code>sk-ant-oat…</code> token it prints.
+            </p>
+            <div>
+              <label className="text-xs font-semibold text-slate-600 dark:text-slate-300" htmlFor="oauth-token">
+                Token from <code>claude setup-token</code>{" "}
+                <span className="font-normal text-slate-400">
+                  (optional{status.auth.cli.oauth_token_env ? " — one is saved; leave blank to keep it" : ""})
+                </span>
+              </label>
+              <input
+                id="oauth-token"
+                type="password"
+                autoComplete="off"
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                placeholder="sk-ant-oat…"
+                className={`mt-1 ${INPUT}`}
+              />
+              <p className="mt-1 text-xs text-slate-400">Saved only to <code>.env</code> in this folder (never committed).</p>
+            </div>
+          </details>
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
+            For personal use on your own computer. Anthropic&apos;s terms ask third-party tools to use API keys
+            rather than claude.ai logins, so don&apos;t host this app for other people in this mode.
+          </p>
+          <details className="text-sm">
+            <summary className="cursor-pointer text-slate-500">Advanced: use an Anthropic API key instead</summary>
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+              Pay-as-you-go billing from the Anthropic Console instead of your Claude plan. Good if you
+              don&apos;t have Claude Pro/Max, or want separate billing.
+            </p>
+            <button type="button" className={`mt-2 ${BTN_GHOST}`} onClick={() => setMode("api_key")}>
+              Switch to an API key
+            </button>
+          </details>
+        </div>
       ) : (
-        <p className="mt-4 rounded-lg bg-slate-100 px-3 py-2 text-sm dark:bg-slate-800">
-          Using your Claude Code login (advanced).{" "}
-          <button type="button" className="text-indigo-600 underline" onClick={() => setMode("api_key")}>
-            Use an API key instead
-          </button>
-        </p>
-      )}
-
-      {mode === "api_key" ? (
         <div className="mt-4">
-          <label className="text-xs font-semibold text-slate-600 dark:text-slate-300" htmlFor="api-key">
+          <p className="rounded-lg bg-slate-100 px-3 py-2 text-sm dark:bg-slate-800">
+            Using an Anthropic API key (advanced).{" "}
+            <button type="button" className="text-indigo-600 underline" onClick={() => setMode("claude_code")}>
+              Sign in with my Claude account instead
+            </button>
+          </p>
+          <ol className="mt-4 space-y-3 text-sm">
+            {[
+              <>Create a free account on the <a className="text-indigo-600 underline" href="https://console.anthropic.com/" target="_blank" rel="noreferrer">Anthropic Console</a> (Anthropic makes Claude).</>,
+              <>Add a payment method under <b>Billing</b>. You pay only for what you use — a daily job search usually costs well under a dollar, and the app shows what each run cost.</>,
+              <>Set a <b>monthly spending limit</b> under <a className="text-indigo-600 underline" href="https://console.anthropic.com/settings/limits" target="_blank" rel="noreferrer">Limits</a> (for example $10). It&apos;s a safety net: Claude simply stops at that amount.</>,
+              <>Open <a className="text-indigo-600 underline" href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer">API keys</a>, click <b>Create key</b>, and copy it (it starts with <code>sk-ant-</code>).</>,
+              <>Paste it below and click <b>Save &amp; test connection</b>.</>,
+            ].map((text, i) => (
+              <li key={i} className="flex gap-3">
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-indigo-600 text-xs font-bold text-white">{i + 1}</span>
+                <span className="pt-0.5 text-slate-700 dark:text-slate-300">{text}</span>
+              </li>
+            ))}
+          </ol>
+          <label className="mt-4 block text-xs font-semibold text-slate-600 dark:text-slate-300" htmlFor="api-key">
             API key {status.auth.api_key_preview && <span className="font-normal text-slate-400">(saved: {status.auth.api_key_preview} — leave blank to keep)</span>}
           </label>
           <input
@@ -386,60 +490,6 @@ function AuthStep({
             className={`mt-1 ${INPUT}`}
           />
           <p className="mt-1 text-xs text-slate-400">Saved only to <code>.env</code> in this folder (never committed).</p>
-          <details className="mt-4 text-sm">
-            <summary className="cursor-pointer text-slate-500">Advanced: use my Claude subscription (Claude Code) instead</summary>
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-              For people who already use Claude Code on this computer. It needs the Claude Code
-              command-line tool, and premium Chrome searches need extra setup. If that sounds
-              unfamiliar, stick with an API key.
-            </p>
-            <button type="button" className={`mt-2 ${BTN_GHOST}`} onClick={() => setMode("claude_code")}>
-              Switch to Claude Code login
-            </button>
-          </details>
-        </div>
-      ) : (
-        <div className="mt-4 space-y-2 text-sm text-slate-600 dark:text-slate-300">
-          <p>
-            {status.auth.cli.cli_found ? (
-              <>✓ Found the Claude Code CLI at <code className="break-all text-xs">{status.auth.cli.cli_path}</code></>
-            ) : (
-              <>✗ Claude Code CLI not found. Install it from claude.com/claude-code.</>
-            )}
-          </p>
-          <ClaudeLogin
-            disabled={!status.auth.cli.cli_found || busy}
-            onError={onError}
-            onLoggedIn={() => void connect()}
-          />
-          <details className="text-sm">
-            <summary className="cursor-pointer text-xs text-slate-500">Paste a token manually instead</summary>
-            <p className="mt-2 text-xs text-slate-500">
-              Run <code>claude setup-token</code> in a terminal, then paste the <code>sk-ant-oat…</code> token it prints.
-            </p>
-          <div>
-            <label className="text-xs font-semibold text-slate-600 dark:text-slate-300" htmlFor="oauth-token">
-              Token from <code>claude setup-token</code>{" "}
-              <span className="font-normal text-slate-400">
-                (optional{status.auth.cli.oauth_token_env ? " — one is saved; leave blank to keep it" : ""})
-              </span>
-            </label>
-            <input
-              id="oauth-token"
-              type="password"
-              autoComplete="off"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              placeholder="sk-ant-oat…"
-              className={`mt-1 ${INPUT}`}
-            />
-            <p className="mt-1 text-xs text-slate-400">Saved only to <code>.env</code> in this folder (never committed).</p>
-          </div>
-          </details>
-          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
-            For personal use on your own machine only. Anthropic&apos;s terms ask third-party tools to use
-            API keys rather than claude.ai logins, so don&apos;t host this app for other people in this mode.
-          </p>
         </div>
       )}
 

@@ -9,6 +9,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import AskJobiButton from "@/components/AskJobiButton";
+
 import { ApiError, api } from "@/lib/api";
 import type { PremiumRecommendations, PremiumRec } from "@/lib/types";
 
@@ -162,7 +164,12 @@ export default function PremiumSuggestions({
         {data.usage.text}
       </p>
 
-      {error && <p className="mt-2 text-xs text-rose-600 dark:text-rose-400">{error}</p>}
+      {error && (
+        <p className="mt-2 text-xs text-rose-600 dark:text-rose-400">
+          {error}
+          <AskJobiButton message={`My premium Chrome search had a problem: "${error}". Can you help?`} />
+        </p>
+      )}
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {step === "pick" && (
@@ -217,6 +224,9 @@ export default function PremiumSuggestions({
         <p className={`mt-2 text-xs ${chrome.connected ? "text-emerald-700 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300"}`}>
           {chrome.connected ? "✓ " : "✗ "}
           {chrome.detail}
+          {!chrome.connected && (
+            <AskJobiButton message={`My Chrome search can't connect. The check said: "${chrome.detail}". Can you help me fix it?`} />
+          )}
         </p>
       )}
     </section>

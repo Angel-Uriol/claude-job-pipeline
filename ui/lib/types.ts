@@ -568,3 +568,64 @@ export interface PrintSpec {
     closing: string;
   } | null;
 }
+
+// ===== Jobi (helper chat) =====
+
+export type JobiCardKind =
+  | "update_profile"
+  | "update_resume"
+  | "set_companies"
+  | "update_search_settings"
+  | "start_search"
+  | "start_premium_search"
+  | "clear_chrome_queue"
+  | "run_command";
+
+export interface JobiCard {
+  id: string;
+  kind: JobiCardKind;
+  title: string;
+  summary: string;
+  before: unknown;
+  after: unknown;
+  payload: Record<string, unknown>;
+  warnings: string[];
+  status: "pending" | "applied" | "dismissed" | "failed";
+  result: string;
+  created_at: string;
+}
+
+export interface JobiMessage {
+  role: "user" | "assistant" | "note";
+  text: string;
+  ts?: string;
+  cards?: string[];
+  handoff?: string;
+  cost_usd?: number;
+}
+
+export interface JobiState {
+  history: JobiMessage[];
+  cards: JobiCard[];
+  model: string;
+  demo: boolean;
+  auth_mode: string;
+  busy: boolean;
+}
+
+export type JobiEvent =
+  | { type: "status"; text: string }
+  | { type: "text"; text: string }
+  | { type: "proposal"; card: JobiCard }
+  | { type: "handoff"; text: string }
+  | { type: "done"; cost_usd: number; text: string }
+  | { type: "error"; text: string };
+
+export interface JobiApplyResult {
+  message: string;
+  card: JobiCard;
+  client_action?: { run: string };
+  ok?: boolean;
+  log?: string;
+  changed?: string;
+}

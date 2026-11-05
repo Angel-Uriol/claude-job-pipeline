@@ -23,6 +23,7 @@ const FEATURE_WORDS: Record<string, string> = {
   research: "Compare & interview prep",
   "premium-search": "Premium Chrome searches",
   "setup-chat": "Setup chat",
+  jobi: "Jobi assistant",
   other: "Other",
 };
 

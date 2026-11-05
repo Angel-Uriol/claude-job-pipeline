@@ -8,6 +8,8 @@
 
 import { useEffect, useState } from "react";
 
+import { useJobiRefresh } from "@/lib/useJobiRefresh";
+
 import ChipInput from "@/components/ChipInput";
 import MyInfoTabs from "@/components/MyInfoTabs";
 import { ApiError, api } from "@/lib/api";
@@ -87,6 +89,7 @@ export default function ResumePage() {
   useEffect(() => {
     load();
   }, []);
+  useJobiRefresh(load);
 
   if (!r) return <main className="mx-auto max-w-3xl px-4 py-8 text-sm text-slate-500">{msg?.text ?? "Loading…"}</main>;
 

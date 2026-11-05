@@ -236,6 +236,13 @@ def run_premium(
     except LLMError as e:
         raise ChromeRunError(str(e)) from e
     cli = _require_cli(s)
+    # Quick connection test first (~10s on Haiku): if Chrome isn't reachable,
+    # stop now instead of spending a full browsing session on Sonnet.
+    if progress:
+        progress("Checking that Claude in Chrome is connected…")
+    pre = check_chrome(s)
+    if not pre.get("connected"):
+        raise ChromeRunError(str(pre.get("detail") or NOT_CONNECTED_HELP))
     names = [*record.get("ad_hoc_companies", []), *record.get("companies", [])]
     urls = [u for u in record.get("job_urls") or [] if u]
     if not names and not urls:
@@ -330,6 +337,8 @@ def run_pending_premium(
                 queue.fail(rec["id"], error=str(e))
             counts["failed"] += 1
             counts["error"] = str(e)
+            if str(e) == NOT_CONNECTED_HELP:
+                counts["error_code"] = "chrome_not_connected"
             if progress:
                 progress(f"Premium search failed: {e}")
             break  # same cause would fail the rest (e.g. Chrome not connected)

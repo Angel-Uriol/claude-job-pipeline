@@ -9,6 +9,7 @@
 
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ApiError, api } from "@/lib/api";
@@ -192,7 +193,20 @@ export default function ProfileChat({
 
       {interview.done ? (
         <div className="flex items-center justify-between gap-3 border-t border-white/10 px-5 py-4 sm:px-8">
-          <span className="text-sm text-slate-400">Profile complete.</span>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+            <span className="text-slate-400">Profile complete.</span>
+            <button
+              type="button"
+              disabled={!!busy}
+              onClick={() => void run("thinking", () => api.setupReopen())}
+              className="font-semibold text-cyan-300 underline-offset-2 hover:underline disabled:opacity-40"
+            >
+              Change my answers
+            </button>
+            <span className="text-slate-500">or edit as a form:</span>
+            <Link href="/profile" className="text-cyan-300 underline-offset-2 hover:underline">profile</Link>
+            <Link href="/resume" className="text-cyan-300 underline-offset-2 hover:underline">resume</Link>
+          </div>
           <button
             type="button"
             onClick={onNext}

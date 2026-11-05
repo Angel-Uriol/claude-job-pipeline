@@ -54,6 +54,10 @@ def _write_yaml(path: Path, data: dict[str, Any]) -> None:
     path.write_text(_comment_header(old) + body, encoding="utf-8")
 
 
+#: Public names for other modules (Jobi) that save through the same writer.
+write_yaml = _write_yaml
+
+
 def _errors(e: ValidationError) -> str:
     parts = []
     for err in e.errors()[:5]:

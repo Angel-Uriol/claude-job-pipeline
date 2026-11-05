@@ -32,6 +32,7 @@ from ..onboarding.interview import (
     ROUND_NAMES,
     InterviewState,
     field_label,
+    reopen,
     resume_received,
     start,
     step,
@@ -310,6 +311,11 @@ def register_setup_routes(app: FastAPI) -> None:
         except ValidationError as e:
             raise HTTPException(422, f"Profile isn't complete yet: {e}") from e
         return {"written": [str(p) for p in written], "configured": True}
+
+    @app.post("/api/setup/interview/reopen")
+    async def setup_reopen() -> dict[str, Any]:
+        """Change a finished profile by chatting again (rebuilt from the saved files)."""
+        return _state_payload(reopen(InterviewState.load()))
 
     @app.post("/api/setup/reset")
     async def setup_reset() -> dict[str, Any]:

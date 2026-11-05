@@ -37,3 +37,20 @@
       color 0.18s ease;
   }
 }
+
+/* ===== Jobi, the floating helper ===== */
+@keyframes jobi-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@keyframes jobi-wiggle { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-6deg); } 75% { transform: rotate(6deg); } }
+@keyframes jobi-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
+@keyframes jobi-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@keyframes jobi-wave { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-25deg); } }
+@keyframes jobi-pop { from { opacity: 0; transform: translateY(12px) scale(0.97); } to { opacity: 1; transform: none; } }
+.jobi-bob { animation: jobi-bob 3.2s ease-in-out infinite; }
+.jobi-wiggle { animation: jobi-wiggle 0.9s ease-in-out infinite; }
+.jobi-blink { animation: jobi-blink 4.5s infinite; }
+.jobi-pulse { animation: jobi-pulse 0.9s ease-in-out infinite; }
+.jobi-wave { animation: jobi-wave 0.8s ease-in-out 2; }
+.jobi-pop { animation: jobi-pop 180ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+@media (prefers-reduced-motion: reduce) {
+  .jobi-bob, .jobi-wiggle, .jobi-blink, .jobi-pulse, .jobi-wave, .jobi-pop { animation: none; }
+}

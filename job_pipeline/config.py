@@ -239,6 +239,8 @@ class LLMSettings(BaseModel):
     fast_model: str = "claude-haiku-5-5"
     # Company suggestions + anything that benefits from more reasoning.
     smart_model: str = "claude-sonnet-5-5"
+    # Jobi, the in-app helper chat (profile edits, searches, fixing issues).
+    assistant_model: str = "claude-opus-5-5"
 
 
 class Resume(BaseModel):

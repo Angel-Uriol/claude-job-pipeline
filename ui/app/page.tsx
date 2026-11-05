@@ -11,6 +11,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+import AskJobiButton from "@/components/AskJobiButton";
+import { useJobiRefresh } from "@/lib/useJobiRefresh";
+
 import Checklist from "@/components/Checklist";
 import Explain from "@/components/Explain";
 import { ApiError, api, openEventStream } from "@/lib/api";
@@ -55,6 +58,7 @@ export default function TodayPage() {
       setError(errText(e));
     }
   }, []);
+  useJobiRefresh(refresh);
 
   // First run → Setup. Also learn whether this is the demo profile.
   useEffect(() => {
@@ -152,6 +156,9 @@ export default function TodayPage() {
           {progress && (
             <p role="status" className="mt-2 max-w-xs text-xs text-slate-500 dark:text-slate-400">
               {progress}
+              {/stopped|failed/i.test(progress) && (
+                <AskJobiButton message={`My search stopped with: "${progress}". What went wrong, and can you fix it?`} />
+              )}
             </p>
           )}
           {data?.budget && <BudgetLine budget={data.budget} />}
@@ -161,6 +168,7 @@ export default function TodayPage() {
       {error && (
         <p className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">
           {error}
+          <AskJobiButton message={`The Today page shows this error: "${error}". Can you help?`} />
         </p>
       )}
 

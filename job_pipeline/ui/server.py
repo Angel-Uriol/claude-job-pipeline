@@ -52,6 +52,7 @@ from ..store import JobStore
 from .document_routes import register_document_routes
 from .edit_routes import register_edit_routes
 from .events import EventBus, PipelineState, event_to_dict
+from .jobi_routes import register_jobi_routes
 from .privacy_routes import register_privacy_routes
 from .profile_routes import register_profile_routes
 from .research_routes import register_research_routes
@@ -227,6 +228,8 @@ def create_app(*, config_path: str | Path | None = None) -> FastAPI:
     register_edit_routes(app)
     # Privacy page + delete everything.
     register_privacy_routes(app)
+    # Jobi, the floating helper chat.
+    register_jobi_routes(app)
 
     @app.exception_handler(FileNotFoundError)
     async def _not_configured(_request: Request, exc: FileNotFoundError) -> JSONResponse:

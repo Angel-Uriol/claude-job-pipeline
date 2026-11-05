@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import ChipInput from "@/components/ChipInput";
 import MyInfoTabs from "@/components/MyInfoTabs";
 import { ApiError, api } from "@/lib/api";
+import { useJobiRefresh } from "@/lib/useJobiRefresh";
 
 type Tier = "A" | "B" | "C";
 interface TargetFunction { name: string; tier: Tier; notes: string }
@@ -43,12 +44,16 @@ export default function ProfilePage() {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  const loadProfile = () =>
     api
       .getProfileInfo()
       .then((r) => setP(r.profile as unknown as ProfileInfo))
       .catch((e) => setMsg({ ok: false, text: e instanceof ApiError ? e.detail : String(e) }));
+
+  useEffect(() => {
+    void loadProfile();
   }, []);
+  useJobiRefresh(loadProfile);
 
   if (!p) return <main className="mx-auto max-w-3xl px-4 py-8 text-sm text-slate-500">{msg?.text ?? "Loading…"}</main>;
 

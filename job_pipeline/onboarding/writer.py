@@ -77,9 +77,27 @@ def _jsearch_queries(draft: ProfileDraft) -> list[dict[str, Any]]:
     return queries[:MAX_JSEARCH_QUERIES]
 
 
-def build_config(draft: ProfileDraft, companies: list[dict[str, Any]]) -> dict[str, Any]:
-    """Config mapping from the example baseline + questionnaire answers."""
-    cfg = copy.deepcopy(_example_config())
+def _saved_config() -> dict[str, Any] | None:
+    """This profile's current config.yaml, if it has one (a re-save)."""
+    p = paths.config_path()
+    if not p.exists():
+        return None
+    try:
+        raw = yaml.safe_load(p.read_text(encoding="utf-8"))
+    except yaml.YAMLError:
+        return None
+    return raw if isinstance(raw, dict) and raw.get("profile") else None
+
+
+def build_config(draft: ProfileDraft, companies: list[dict[str, Any]],
+                 base: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Config mapping from a baseline + questionnaire answers.
+
+    The baseline is the example config for a new profile, or `base` (the
+    profile's saved config) on a re-save, so settings changed since setup
+    (score caps, models, rejected companies…) are kept.
+    """
+    cfg = copy.deepcopy(base or _example_config())
     cfg["profile"] = draft_to_profile_dict(draft)
 
     selected = [c for c in companies if c.get("selected", True)]
@@ -99,7 +117,7 @@ def build_config(draft: ProfileDraft, companies: list[dict[str, Any]]) -> dict[s
     cfg["scrapers"] = scrapers
 
     cfg["excluded_companies"] = [c.lower() for c in (draft.excluded_companies or [])]
-    cfg["dead_companies"] = []
+    cfg["dead_companies"] = list(cfg.get("dead_companies") or []) if base else []
     filters = cfg.setdefault("filters", {})
     filters["location_tokens"] = [t.lower() for t in (draft.location_tokens or [])]
     filters["allow_remote"] = bool(draft.allow_remote)
@@ -107,7 +125,9 @@ def build_config(draft: ProfileDraft, companies: list[dict[str, Any]]) -> dict[s
         filters["remote_excluded_tokens"] = list(NON_US_TOKENS)
     # No location words at all → don't silently drop every job.
     filters["location_filter_enabled"] = bool(filters["location_tokens"]) or not draft.allow_remote
-    cfg.setdefault("chrome_claude", {})["exclude_companies"] = []
+    cfg.setdefault("chrome_claude", {}).setdefault("exclude_companies", [])
+    if not base:
+        cfg["chrome_claude"]["exclude_companies"] = []
     return cfg
 
 
@@ -143,7 +163,7 @@ def skeleton_resume(draft: ProfileDraft) -> dict[str, Any]:
 
 def build_files(state: InterviewState) -> dict[str, str]:
     """Render the profile files as YAML text (for review). Validates both."""
-    cfg = build_config(state.draft, state.companies)
+    cfg = build_config(state.draft, state.companies, base=_saved_config())
     Config(**cfg)  # raises pydantic.ValidationError on anything malformed
     resume = copy.deepcopy(state.resume_content or skeleton_resume(state.draft))
     if state.draft.resume_location:
