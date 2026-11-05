@@ -66,6 +66,10 @@ class PremiumBody(BaseModel):
     companies: list[str]
 
 
+class LoginStartBody(BaseModel):
+    kind: Literal["full", "token"] = "full"
+
+
 class LoginInputBody(BaseModel):
     text: str
 
@@ -150,8 +154,17 @@ def register_setup_routes(app: FastAPI) -> None:
     # One-click "Log in with Claude": runs `claude setup-token` server-side and
     # captures the token (see onboarding/login.py). The page polls /status.
     @app.post("/api/setup/login/start")
-    async def setup_login_start() -> dict[str, Any]:
-        return await asyncio.to_thread(claude_login.start, load_secrets().claude_cli_path)
+    async def setup_login_start(body: LoginStartBody | None = None) -> dict[str, Any]:
+        kind = body.kind if body else "full"
+        return await asyncio.to_thread(claude_login.start, load_secrets().claude_cli_path,
+                                       kind)
+
+    @app.get("/api/setup/chrome")
+    async def setup_chrome() -> dict[str, Any]:
+        """Chrome search checklist: CLI, full Claude sign-in, extension installed."""
+        from ..chrome_runner import chrome_readiness
+
+        return await asyncio.to_thread(chrome_readiness)
 
     @app.get("/api/setup/login/status")
     async def setup_login_status() -> dict[str, Any]:

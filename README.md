@@ -26,6 +26,15 @@ Everything stays on your computer. Claude only sees what each step needs.
 
 ## Quick start
 
+### What you need
+
+| | What | Why |
+|---|---|---|
+| **Required** | A **Claude account** (Pro or Max), or an Anthropic API key | Claude reads jobs, scores them and tailors your resume |
+| **Required** | A Mac or Windows computer | The app runs locally; your data stays on it |
+| Installed for you | Python, Node.js, the resume builder, **Claude Code** | Setup's **Set up everything** button installs whatever is missing |
+| Optional | **Google Chrome** + the [Claude in Chrome](https://claude.ai/chrome) extension | Premium searches of company careers sites in your browser |
+
 ### The easy way (no terminal)
 
 1. On GitHub, click **Code → Download ZIP**, then unzip it anywhere.
@@ -38,7 +47,7 @@ Everything stays on your computer. Claude only sees what each step needs.
 4. Leave the small window open while you use the app; close it to stop.
 
 Want to look around first? On the Setup page click **Try the demo** — it loads made-up
-jobs so you can explore before creating an API key.
+jobs so you can explore before signing in.
 
 ### For developers
 
@@ -54,7 +63,7 @@ Open **http://localhost:8766**. The first visit takes you to the **Setup** page:
 
 | Step | What happens |
 |---|---|
-| 1. Install | One click installs what's still missing: the resume renderer, and (optionally) the Claude Code CLI via Anthropic's official installer. |
+| 1. Before you start | Lists everything the app needs. **Set up everything** installs what's missing (the resume builder, and Claude Code via Anthropic's official installer), then moves you on to sign in. Chrome and the Claude in Chrome extension are linked, since they can't be installed from the app. |
 | 2. Connect Claude | Sign in with your Claude account (default), **or** paste an Anthropic API key under Advanced (see below). |
 | 3. Your profile | One chat with Claude, mostly tap-to-answer options. It starts with "Do you have a resume?" — upload it right in the chat, or say no and Claude builds one with you (industry, experience, projects). Then three rounds: **About you** → a live mini-pipeline (scrape the job boards → apply your location/title rules → Claude rates the top candidates → shows the best with reasons) → **What the market asks** ("3 of the 8 roles I found ask for Kafka — have you used it?") → a second, sharper scan → **Sharpen**. |
 | 4. Companies | Pre-filled with the employers found during the scans (job boards already verified); trim, add, re-check. |
@@ -75,7 +84,7 @@ uv run job-pipeline daily     # scrape → pre-filter → deep-fit → digest �
 
 | Mode | How | Best for |
 |---|---|---|
-| **Sign in with Claude** (default) | Click **Install** on step 1 (or install [Claude Code](https://claude.com/claude-code) yourself), then **Log in with Claude**: your browser opens for the Claude login, and when it says "You're all set" the page picks up the token by itself (it runs `claude setup-token` for you and saves the token to `.env`). The app drives that CLI through the [Claude Agent SDK](https://docs.claude.com/en/docs/agent-sdk/overview), so you don't paste a key. | Claude Pro/Max users running the tool for themselves, on their own machine. No extra bill; counts against your plan's limits. |
+| **Sign in with Claude** (default) | Click **Install** on step 1 (or install [Claude Code](https://claude.com/claude-code) yourself), then **Log in with Claude**: your browser opens for the Claude login, and when it says "You're all set" the page continues by itself (it runs `claude auth login` for you; the CLI keeps the sign-in in your system keychain). The app drives that CLI through the [Claude Agent SDK](https://docs.claude.com/en/docs/agent-sdk/overview), so you don't paste a key. | Claude Pro/Max users running the tool for themselves, on their own machine. No extra bill; counts against your plan's limits. |
 | **API key** (Advanced) | Create a key at [console.anthropic.com](https://console.anthropic.com/settings/keys) and paste it on the Setup page. It's saved to `.env`, which is gitignored. | No Claude plan, separate billing, or sharing the app with others. Pay-as-you-go. |
 
 > **About Claude Code login mode:** Anthropic's terms ask third-party tools to use
@@ -210,10 +219,15 @@ thresholds in config. Jobs at your target companies get a tier bump (+0.3 to +0.
   weekly plan usage (when Claude exposes it) and how much of a session a
   premium search uses — measured on your own past runs; on an API key, a dollar
   estimate learned from your past runs.
-  *Needs:* Claude Code mode logged in, and the Claude in Chrome extension logged
-  into the same account **and attached to Claude Code**. Chrome connects the
-  extension to one app at a time, so if you use Claude Desktop: quit it, run
-  `claude` in a terminal, then `/chrome` → Reconnect.
+  *Needs:* the Claude Code CLI with a **full Claude sign-in** (Setup → Connect
+  Claude → "Log in with Claude" / "Sign in for Chrome", which runs
+  `claude auth login`), and the [Claude in Chrome](https://claude.ai/chrome)
+  extension signed into the same account, with Chrome open. Setup's "Connect
+  Chrome" checklist checks each one and tests the connection.
+  *Why the full sign-in:* Claude Code reaches the extension through Anthropic's
+  browser bridge, and the bridge rejects the quick `claude setup-token` token
+  ("OAuth token forbidden (403) — missing scope"). Claude Desktop being open
+  doesn't get in the way.
 - **Chrome Claude (browser agent):** companies without a public board get a
   copy-paste prompt in the digest. Or use **Run Chrome Claude** in Discover to queue
   a run, which a Claude Code session with the

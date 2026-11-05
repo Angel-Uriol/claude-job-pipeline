@@ -87,11 +87,12 @@ def test_run_pending_records_failure(env: Any, monkeypatch: pytest.MonkeyPatch) 
     rec = _queue()
 
     def boom(*a: Any, **k: Any) -> Any:
-        raise chrome_runner.ChromeRunError(chrome_runner.NOT_CONNECTED_HELP)
+        raise chrome_runner.ChromeRunError(chrome_runner.NOT_CONNECTED_HELP,
+                                           chrome_runner.CODE_NOT_CONNECTED)
 
     monkeypatch.setattr(chrome_runner, "run_premium", boom)
     counts = chrome_runner.run_pending_premium(cfg, store, profile="angel")
-    assert counts["failed"] == 1 and "Reconnect" in counts["error"]
+    assert counts["failed"] == 1 and "claude.ai/chrome" in counts["error"]
     # Not connected → stays queued, so it runs after reconnecting.
     assert [r["id"] for r in chrome_queue.ChromeQueue().pending_for("angel")] == [rec["id"]]
 
@@ -109,13 +110,21 @@ def test_nothing_queued(env: Any) -> None:
     assert chrome_runner.run_pending_premium(cfg, store, profile="angel")["requests"] == 0
 
 
+def _full_login(monkeypatch: pytest.MonkeyPatch, logged_in: bool = True) -> None:
+    monkeypatch.setattr("job_pipeline.llm.cli_client.cli_account", lambda *a, **k: {
+        "logged_in": logged_in, "method": "claude.ai" if logged_in else "none",
+        "email": "jordan@example.com" if logged_in else "", "plan": "pro"})
+
+
 def test_check_chrome_reports_not_connected(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(chrome_runner, "_require_cli", lambda s: "/bin/claude")
+    _full_login(monkeypatch)
     monkeypatch.setattr(chrome_runner, "_run", lambda coro: (coro.close(), (
         "NOT_CONNECTED Browser extension is not connected.",
         ["mcp__claude-in-chrome__tabs_context_mcp"], 0.01))[1])
     out = chrome_runner.check_chrome()
-    assert out["connected"] is False and "/chrome" in out["detail"]
+    assert out["connected"] is False and out["code"] == chrome_runner.CODE_NOT_CONNECTED
+    assert "claude.ai/chrome" in out["detail"]
     monkeypatch.setattr(chrome_runner, "_run", lambda coro: (coro.close(), (
         "CONNECTED", ["mcp__claude-in-chrome__tabs_context_mcp"], 0.01))[1])
     assert chrome_runner.check_chrome()["connected"] is True
@@ -135,7 +144,8 @@ def test_premium_stops_early_when_chrome_not_connected(
     sessions: list[str] = []
     monkeypatch.setattr(chrome_runner, "_require_cli", lambda s: "/bin/claude")
     monkeypatch.setattr(chrome_runner, "check_chrome", lambda s=None: {
-        "connected": False, "detail": chrome_runner.NOT_CONNECTED_HELP})
+        "connected": False, "detail": chrome_runner.NOT_CONNECTED_HELP,
+        "code": chrome_runner.CODE_NOT_CONNECTED})
     monkeypatch.setattr(chrome_runner, "_session", lambda *a, **k: sessions.append("x"))
     rec = _queue()
     counts = chrome_runner.run_pending_premium(cfg, store, profile="angel")
@@ -143,3 +153,107 @@ def test_premium_stops_early_when_chrome_not_connected(
     assert sessions == []
     # Still queued, so it runs once Chrome is reconnected.
     assert [r["id"] for r in chrome_queue.ChromeQueue().pending_for("angel")] == [rec["id"]]
+
+
+# The real cause found on 2026-11-04: Claude Code reaches the extension via
+# Anthropic's browser bridge, which rejects the setup-token with a 403.
+BRIDGE_403 = ('[Claude in Chrome] Bridge received: {"type":"error","error":"OAuth token '
+              'forbidden (403) — missing scope, org access, or network not allowed by org"}')
+BRIDGE_OK = ("[Claude in Chrome] Paired with Chrome extension (duration: 869ms)\n"
+             "[Claude in Chrome] Selected Chrome extension: 59301c7b...\n"
+             "[Claude in Chrome] Tool call completed: tabs_context_mcp (9a73d4a1) in 234ms")
+
+
+def test_debug_log_diagnosis() -> None:
+    assert chrome_runner.diagnose_debug_log(BRIDGE_403) == chrome_runner.CODE_NEEDS_LOGIN
+    assert chrome_runner.diagnose_debug_log(BRIDGE_OK) == ""
+    assert chrome_runner.diagnose_debug_log("Connection timeout") == \
+        chrome_runner.CODE_NOT_CONNECTED
+
+
+def test_check_chrome_names_the_missing_full_login(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(chrome_runner, "_require_cli", lambda s: "/bin/claude")
+    _full_login(monkeypatch, logged_in=False)
+
+    def fake_run(coro: Any) -> Any:
+        log = coro.cr_frame.f_locals["debug_file"]
+        log.write_text(BRIDGE_403)
+        coro.close()
+        return ("NOT_CONNECTED Browser extension is not connected.",
+                ["mcp__claude-in-chrome__tabs_context_mcp"], 0.0)
+
+    monkeypatch.setattr(chrome_runner, "_run", fake_run)
+    out = chrome_runner.check_chrome()
+    assert out["code"] == chrome_runner.CODE_NEEDS_LOGIN
+    assert "Sign in for Chrome" in out["detail"]
+
+
+def test_chrome_sessions_skip_the_setup_token_when_fully_signed_in(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    from job_pipeline.config import Secrets
+
+    s = Secrets(CLAUDE_CODE_OAUTH_TOKEN="sk-ant-oat-setup-token")  # type: ignore[call-arg]
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "sk-ant-oat-from-shell")
+    _full_login(monkeypatch)
+    assert "CLAUDE_CODE_OAUTH_TOKEN" not in chrome_runner._child_env("/bin/claude", s)
+    _full_login(monkeypatch, logged_in=False)
+    env = chrome_runner._child_env("/bin/claude", s)
+    assert env["CLAUDE_CODE_OAUTH_TOKEN"] == "sk-ant-oat-setup-token"
+
+
+def test_readiness_finds_the_extension(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    (tmp_path / "Default" / "Extensions" / chrome_runner.EXTENSION_ID).mkdir(parents=True)
+    monkeypatch.setattr(chrome_runner, "_chrome_profile_roots", lambda: [tmp_path])
+    assert chrome_runner.extension_installed() is True
+    monkeypatch.setattr(chrome_runner, "_chrome_profile_roots", lambda: [tmp_path / "nope"])
+    assert chrome_runner.extension_installed() is None
+
+
+def test_check_trusts_the_log_over_the_models_reading(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """Haiku once answered NOT_CONNECTED for "This session has no tab group of
+    its own" — a connected extension. The debug log decides."""
+    monkeypatch.setattr(chrome_runner, "_require_cli", lambda s: "/bin/claude")
+    _full_login(monkeypatch)
+
+    def fake_run(coro: Any) -> Any:
+        coro.cr_frame.f_locals["debug_file"].write_text(BRIDGE_OK)
+        coro.close()
+        return ("NOT_CONNECTED: This session has no tab group of its own.",
+                ["mcp__claude-in-chrome__tabs_context_mcp"], 0.0)
+
+    monkeypatch.setattr(chrome_runner, "_run", fake_run)
+    out = chrome_runner.check_chrome()
+    assert out["connected"] is True and "jordan@example.com" in out["detail"]
+
+
+def test_out_of_steps_search_is_salvaged(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A search that hits the step limit is resumed once, without browser
+    tools, to return the roles it already verified."""
+    import asyncio
+
+    import claude_agent_sdk
+    from claude_agent_sdk import ResultMessage, SystemMessage
+
+    from job_pipeline.config import Secrets
+
+    calls: list[Any] = []
+
+    async def fake_query(*, prompt: str, options: Any) -> Any:
+        calls.append(options)
+        if options.resume is None:
+            yield SystemMessage(subtype="init", data={"session_id": "sess-1"})
+            raise RuntimeError("Claude Code returned an error result: Reached maximum "
+                               "number of turns (120)")
+        yield ResultMessage(subtype="success", duration_ms=1, duration_api_ms=1,
+                            is_error=False, num_turns=1, session_id="sess-1",
+                            total_cost_usd=0.02, result='{"jobs": [], "notes": "partial"}')
+
+    monkeypatch.setattr(claude_agent_sdk, "query", fake_query)
+    monkeypatch.setattr(chrome_runner, "_child_env", lambda cli, s: {})
+    text, _tools, cost = asyncio.run(chrome_runner._session(
+        "search", cli="/bin/claude", secrets=Secrets(), model="claude-sonnet-5-5",
+        max_turns=120, progress=None, salvage=True))
+    assert '"partial"' in text and cost == pytest.approx(0.02)
+    assert calls[1].resume == "sess-1" and calls[1].allowed_tools == []
+    assert "mcp__claude-in-chrome__navigate" in calls[1].disallowed_tools

@@ -267,3 +267,52 @@ def describe_cli(cli_path: str = "", oauth_token: str = "") -> dict[str, Any]:
         "cli_path": path,
         "oauth_token_env": bool(oauth_token or os.environ.get("CLAUDE_CODE_OAUTH_TOKEN")),
     }
+
+
+# --- the CLI's own (full) Claude sign-in -----------------------------------------
+
+_ACCOUNT_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+ACCOUNT_CACHE_SECONDS = 30
+
+
+def cli_account(cli_path: str = "", *, fresh: bool = False) -> dict[str, Any]:
+    """Is the Claude Code CLI signed in with a FULL Claude login (`claude auth
+    login`)? Returns {"logged_in", "method", "email", "plan"}.
+
+    Why it matters: the token from `claude setup-token` only allows model
+    calls. Claude in Chrome goes through Anthropic's browser bridge, which
+    needs the full sign-in's scopes — with only the setup token it answers
+    "OAuth token forbidden (403) — missing scope". So Chrome sessions use
+    this login and never the setup token.
+    """
+    import json as _json
+    import subprocess
+    import time
+
+    cli = resolve_claude_cli(cli_path)
+    if not cli:
+        return {"logged_in": False, "method": "none", "email": "", "plan": ""}
+    hit = _ACCOUNT_CACHE.get(cli)
+    if hit and not fresh and time.time() - hit[0] < ACCOUNT_CACHE_SECONDS:
+        return hit[1]
+    env = {k: v for k, v in os.environ.items()
+           if k not in (*STRIP_ENV, "CLAUDE_CODE_OAUTH_TOKEN")}
+    try:
+        proc = subprocess.run([cli, "auth", "status"], capture_output=True, text=True,
+                              timeout=20, check=False, env=env)
+        data = _json.loads(proc.stdout or "{}")
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        data = {}
+    out = {
+        "logged_in": bool(data.get("loggedIn")) and data.get("authMethod") == "claude.ai",
+        "method": str(data.get("authMethod") or "none"),
+        "email": str(data.get("email") or ""),
+        "plan": str(data.get("subscriptionType") or ""),
+    }
+    _ACCOUNT_CACHE[cli] = (time.time(), out)
+    return out
+
+
+def forget_cli_account() -> None:
+    """Drop the cached sign-in status (after a login or logout)."""
+    _ACCOUNT_CACHE.clear()

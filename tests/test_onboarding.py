@@ -382,8 +382,12 @@ def test_system_checks_shape() -> None:
     from job_pipeline.onboarding.system import system_checks
 
     checks = {c["id"]: c for c in system_checks()}
-    assert set(checks) == {"node", "renderer", "claude_cli"}
-    assert checks["claude_cli"]["optional"] is True
+    assert set(checks) == {"node", "renderer", "claude_cli", "chrome", "chrome_extension"}
+    assert checks["claude_cli"]["blocks"] is False  # API-key users can skip it
+    assert checks["renderer"]["group"] == "required"
+    assert checks["chrome_extension"]["group"] == "chrome"
+    assert checks["chrome_extension"]["optional"] is True
+    assert all(c["why"] for c in checks.values())
 
 
 def test_install_unknown_component() -> None:

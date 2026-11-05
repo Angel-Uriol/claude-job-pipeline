@@ -1,5 +1,11 @@
 """One-click "Log in with Claude" for Claude Code mode.
 
+Since 2026-11-04 the button runs the FULL sign-in, `claude auth login
+--claudeai` (saved by the CLI itself, in the macOS Keychain): it allows model
+calls AND Claude in Chrome. The older `claude setup-token` token only allows
+model calls — Anthropic's browser bridge rejects it — so it's kept only as the
+manual paste-a-token fallback. Notes below describe both flows.
+
 `claude setup-token` is an interactive terminal program: it opens the browser
 for the Claude login and, once you approve, PRINTS a long-lived token
 (`sk-ant-oat…`). A web page can't see that terminal, so we run the program
@@ -57,6 +63,8 @@ class _Session:
     started_at: float = 0.0
     proc: subprocess.Popen[bytes] | None = None
     master_fd: int | None = None
+    kind: str = "full"           # "full" (`claude auth login`) | "token" (setup-token)
+    cli: str = ""
     lock: threading.Lock = field(default_factory=threading.Lock)
 
 
@@ -101,6 +109,10 @@ def _reader() -> None:
                 break
             raw += chunk.decode("utf-8", errors="replace")
             text = _clean(raw)
+            if _S.kind == "full" and "login successful" in text.lower():
+                with _S.lock:
+                    _finish_full_login()
+                return
             # Search line by line — never join lines (that glued the next
             # line's words onto the token). The pty is 400 columns wide, so
             # the token is always printed on a single line.
@@ -125,18 +137,42 @@ def _reader() -> None:
             break
     with _S.lock:
         if _S.state == "running":
-            _finish("error", "The login ended without a token. Check the output and try again.")
+            if _S.kind == "full":
+                _finish_full_login()
+            else:
+                _finish("error",
+                        "The login ended without a token. Check the output and try again.")
 
 
-def start(cli_path: str = "") -> dict[str, Any]:
-    """Start `claude setup-token` in a pseudo-terminal (no-op if running)."""
+def _finish_full_login() -> None:
+    """`claude auth login` ended: confirm with `claude auth status`, then use it."""
+    from ..llm.cli_client import cli_account, forget_cli_account
+
+    forget_cli_account()
+    account = cli_account(_S.cli, fresh=True)
+    if not account["logged_in"]:
+        _finish("error", "The sign-in didn't finish. Try again.")
+        return
+    # The full sign-in replaces any older setup token (which would take
+    # precedence over it and can't use Chrome).
+    set_env_values({"JOB_PIPELINE_AUTH_MODE": "claude_code", "CLAUDE_CODE_OAUTH_TOKEN": ""})
+    who = f" as {account['email']}" if account["email"] else ""
+    _finish("done", f"Signed in{who}.")
+
+
+def start(cli_path: str = "", kind: str = "full") -> dict[str, Any]:
+    """Start the sign-in in a pseudo-terminal (no-op if running).
+
+    kind="full" runs `claude auth login --claudeai` (default; works for
+    Chrome), kind="token" runs `claude setup-token`.
+    """
     with _S.lock:
         if _S.state == "running":
             return status()
         if sys.platform == "win32":
             _S.state, _S.message = "error", (
-                "One-click login isn't available on Windows yet. Run `claude setup-token` "
-                "in a terminal and paste the token below."
+                "One-click login isn't available on Windows yet. Open a terminal, run "
+                "`claude auth login`, finish the sign-in, then click Save & test connection."
             )
             return status()
         cli = resolve_claude_cli(cli_path)
@@ -155,7 +191,9 @@ def start(cli_path: str = "") -> dict[str, Any]:
         for k in ("ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "CLAUDECODE"):
             env.pop(k, None)
         try:
-            proc = subprocess.Popen([cli, "setup-token"], stdin=slave, stdout=slave,
+            argv = [cli, "auth", "login", "--claudeai"] if kind == "full" \
+                else [cli, "setup-token"]
+            proc = subprocess.Popen(argv, stdin=slave, stdout=slave,
                                     stderr=slave, env=env, start_new_session=True)
         except OSError as e:
             os.close(master)
@@ -166,6 +204,7 @@ def start(cli_path: str = "") -> dict[str, Any]:
         _S.state, _S.message = "running", "Finish the login in the browser window that opened."
         _S.auth_url, _S.prompt, _S.output = None, None, ""
         _S.proc, _S.master_fd, _S.started_at = proc, master, time.time()
+        _S.kind, _S.cli = kind, cli
     threading.Thread(target=_reader, daemon=True, name="claude-login").start()
     return status()
 

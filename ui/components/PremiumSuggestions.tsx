@@ -12,7 +12,7 @@ import { useCallback, useEffect, useState } from "react";
 import AskJobiButton from "@/components/AskJobiButton";
 
 import { ApiError, api } from "@/lib/api";
-import type { PremiumRecommendations, PremiumRec } from "@/lib/types";
+import type { ChromeCheck, PremiumRecommendations, PremiumRec } from "@/lib/types";
 
 const PRIORITY_STYLE: Record<PremiumRec["priority"], string> = {
   high: "bg-fuchsia-600 text-white",
@@ -38,7 +38,7 @@ export default function PremiumSuggestions({
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [hidden, setHidden] = useState(false);
   const [step, setStep] = useState<"pick" | "queued" | "launched">("pick");
-  const [chrome, setChrome] = useState<{ connected: boolean; detail: string } | null>(null);
+  const [chrome, setChrome] = useState<ChromeCheck | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -224,6 +224,9 @@ export default function PremiumSuggestions({
         <p className={`mt-2 text-xs ${chrome.connected ? "text-emerald-700 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300"}`}>
           {chrome.connected ? "✓ " : "✗ "}
           {chrome.detail}
+          {chrome.code === "chrome_needs_login" && (
+            <a href="/setup" className="ml-2 font-semibold underline">Open Setup → Connect Claude</a>
+          )}
           {!chrome.connected && (
             <AskJobiButton message={`My Chrome search can't connect. The check said: "${chrome.detail}". Can you help me fix it?`} />
           )}

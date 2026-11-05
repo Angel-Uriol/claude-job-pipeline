@@ -392,12 +392,20 @@ export interface SetupStatus {
 }
 
 export interface SystemCheck {
-  id: "node" | "renderer" | "claude_cli";
+  id: "node" | "renderer" | "claude_cli" | "chrome" | "chrome_extension";
   label: string;
   ok: boolean;
   detail: string;
   installable: boolean;
   optional: boolean;
+  /** One plain sentence: what it's for. */
+  why: string;
+  /** "required" for the app, "chrome" for premium searches only. */
+  group: "required" | "chrome";
+  /** Where to get it when it can't be installed with one click. */
+  url: string;
+  /** Can't continue without it. */
+  blocks: boolean;
 }
 
 export interface LoginStatus {
@@ -628,4 +636,24 @@ export interface JobiApplyResult {
   ok?: boolean;
   log?: string;
   changed?: string;
+}
+
+// ===== Chrome searches (Claude in Chrome) =====
+
+export interface ChromeReadiness {
+  cli_found: boolean;
+  /** Full Claude sign-in (`claude auth login`), needed for Chrome. */
+  signed_in: boolean;
+  account: string;
+  plan: string;
+  /** null = Chrome's folder wasn't found (unknown). */
+  extension_installed: boolean | null;
+  extension_url: string;
+}
+
+export interface ChromeCheck {
+  connected: boolean;
+  detail: string;
+  code?: "" | "chrome_not_connected" | "chrome_needs_login" | "claude_cli_missing";
+  account?: string;
 }

@@ -31,12 +31,15 @@ Fixing problems
 - Start with diagnose (and recent_runs for failed searches). Explain the cause in one
   or two plain sentences, then propose the fix (propose_command for the allowlisted
   commands, propose_clear_chrome_queue for stuck searches).
-- Premium Chrome search problems: the Claude in Chrome extension connects to ONE app
-  at a time. If Claude Desktop (or another Claude Code window) holds it, the app's
-  search can't reach Chrome. Steps for the user: (1) make sure the extension is
-  installed and signed into the same Claude account; (2) quit Claude Desktop, or
-  open a terminal, run `claude`, type `/chrome` and pick Reconnect; (3) then propose
-  the chrome_check command to test again.
+- Premium Chrome search problems: call diagnose(chrome=true) or propose the chrome_check
+  command; its result names the cause:
+  * "needs a full Claude sign-in" (the usual one): the quick sign-in token can score
+    jobs but Anthropic doesn't let it use Chrome. Fix: Setup → Connect Claude →
+    "Sign in for Chrome" (approve in the browser), then test again.
+  * "didn't answer": the Claude in Chrome extension isn't installed, isn't signed in
+    with the same Claude account, or Chrome is closed. Fix: install it from
+    claude.ai/chrome, click its icon and sign in, keep Chrome open, test again.
+  Claude Desktop being open is fine — it doesn't block the app's Chrome searches.
 - If it still fails, or the fix needs code changes, call handoff_prompt: it writes a
   message the user pastes into a NEW Claude Code Desktop chat (that chat has Chrome
   and can follow the app's runbook). Tell them: open Claude Desktop → Code → new

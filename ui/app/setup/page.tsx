@@ -13,9 +13,12 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import MadeBy from "@/components/MadeBy";
 import ProfileChat from "@/components/ProfileChat";
 import { ApiError, api } from "@/lib/api";
 import type {
+  ChromeCheck,
+  ChromeReadiness,
   AuthMode,
   SetupCompany,
   SetupInterview,
@@ -27,7 +30,7 @@ import type {
 type Step = 0 | 1 | 2 | 3 | 4;
 
 const STEPS: { n: Step; label: string }[] = [
-  { n: 0, label: "Install" },
+  { n: 0, label: "Get ready" },
   { n: 1, label: "Connect Claude" },
   { n: 2, label: "Your profile" },
   { n: 3, label: "Companies" },
@@ -49,7 +52,7 @@ function errText(e: unknown): string {
 
 /** Pick the first step that still needs doing. */
 function firstOpenStep(s: SetupStatus, checks: SystemCheck[]): Step {
-  if (checks.some((c) => !c.ok && !c.optional)) return 0;
+  if (checks.some((c) => !c.ok && c.group === "required")) return 0;
   if (!s.auth.connected) return checks.every((c) => c.ok) ? 1 : 0;
   const iv = s.interview;
   if (!iv.done) return 2;
@@ -98,6 +101,8 @@ export default function SetupPage() {
         Everything stays on this machine in <code>{status.profile_dir}</code>. Claude only sees what
         it needs for each step.
       </p>
+
+      <MadeBy />
 
       {status.configured && (
         <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
@@ -174,6 +179,38 @@ export default function SetupPage() {
 
 // ===== step 0: install =====
 
+function RequirementRow({ c, busy, onInstall }: { c: SystemCheck; busy: string | null; onInstall: (c: SystemCheck) => void }) {
+  return (
+    <li className="flex items-start gap-3 py-3">
+      <span
+        className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold ${
+          c.ok
+            ? "bg-emerald-600 text-white"
+            : c.blocks
+              ? "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300"
+              : "bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-300"
+        }`}
+      >
+        {c.ok ? "✓" : busy === c.id ? "…" : "!"}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold">{c.label}</p>
+        <p className="text-xs text-slate-600 dark:text-slate-300">{c.why}</p>
+        <p className="break-all text-xs text-slate-400">{c.detail}</p>
+      </div>
+      {c.installable ? (
+        <button type="button" className={BTN_GHOST} disabled={busy !== null} onClick={() => onInstall(c)}>
+          {busy === c.id ? "Installing…" : "Install"}
+        </button>
+      ) : !c.ok && c.url ? (
+        <a href={c.url} target="_blank" rel="noreferrer" className={BTN_GHOST}>
+          Get it ↗
+        </a>
+      ) : null}
+    </li>
+  );
+}
+
 function InstallStep({
   onError,
   onNext,
@@ -184,13 +221,23 @@ function InstallStep({
   const [checks, setChecks] = useState<SystemCheck[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [log, setLog] = useState<string | null>(null);
+  const [rechecking, setRechecking] = useState(false);
+
+  const recheck = useCallback(async () => {
+    setRechecking(true);
+    try {
+      setChecks((await api.setupSystem()).checks);
+    } catch (e) {
+      onError(errText(e));
+    } finally {
+      setRechecking(false);
+    }
+  }, [onError]);
 
   useEffect(() => {
-    api
-      .setupSystem()
-      .then((r) => setChecks(r.checks))
-      .catch((e) => onError(errText(e)));
-  }, [onError]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void recheck();
+  }, [recheck]);
 
   const installOne = async (c: SystemCheck) => {
     setBusy(c.id);
@@ -211,71 +258,106 @@ function InstallStep({
     }
   };
 
-  const installAll = async () => {
+  // One click: install everything that can be installed from here, then move
+  // on to signing in once nothing required is missing.
+  const setUpEverything = async () => {
     setLog(null);
     for (const c of checks ?? []) {
       if (c.installable && !(await installOne(c))) return;
     }
+    const fresh = (await api.setupSystem()).checks;
+    setChecks(fresh);
+    if (!fresh.some((c) => !c.ok && c.blocks)) onNext();
   };
 
-  const missing = (checks ?? []).filter((c) => c.installable);
-  const blocking = (checks ?? []).some((c) => !c.ok && !c.optional);
+  const all = checks ?? [];
+  const required = all.filter((c) => c.group === "required");
+  const chrome = all.filter((c) => c.group === "chrome");
+  const installable = all.filter((c) => c.installable);
+  const blocking = all.some((c) => !c.ok && c.blocks);
+  const allReady = checks !== null && required.every((c) => c.ok);
 
   return (
     <section className={CARD}>
-      <h2 className="text-lg font-semibold">Install what&apos;s needed</h2>
+      <h2 className="text-lg font-semibold">Before you start</h2>
       <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-        One click sets up the pieces the pipeline uses on this computer. The Claude Code CLI is only
-        needed if you want to use your Claude login instead of an API key.
+        Here&apos;s everything the app needs. Most of it installs with one click.
       </p>
 
-      <DemoOffer />
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        {[
+          ["👤", "A Claude account", "Claude Pro or Max. Or an Anthropic API key if you prefer pay-as-you-go."],
+          ["💻", "This computer", "Mac or Windows. The app runs here, and your data stays here."],
+          ["🌐", "Chrome (optional)", "Google Chrome + the Claude in Chrome extension, for premium searches."],
+        ].map(([icon, title, text]) => (
+          <div key={title} className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/60">
+            <p className="text-sm font-semibold">
+              <span aria-hidden="true">{icon}</span> {title}
+            </p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{text}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-5 flex flex-wrap items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50/60 p-4 dark:border-indigo-500/30 dark:bg-indigo-500/10">
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold text-slate-900 dark:text-slate-100">
+            {allReady ? "Everything required is installed ✓" : "Set everything up with one click"}
+          </p>
+          <p className="text-xs text-slate-600 dark:text-slate-300">
+            {allReady
+              ? "Next: sign in with your Claude account."
+              : "Installs what's missing below (takes a minute or two), then takes you to sign in."}
+          </p>
+        </div>
+        <button
+          type="button"
+          className={`${BTN} px-6 py-3 text-base`}
+          disabled={busy !== null || checks === null}
+          onClick={() => void (installable.length ? setUpEverything() : onNext())}
+        >
+          {busy ? "Setting up… (a minute or two)" : installable.length ? "Set up everything" : "Continue to sign in →"}
+        </button>
+      </div>
 
       {checks === null ? (
-        <p className="mt-4 text-sm text-slate-400">Checking this machine…</p>
+        <p className="mt-4 text-sm text-slate-400">Checking this computer…</p>
       ) : (
-        <ul className="mt-4 divide-y divide-slate-100 dark:divide-slate-800">
-          {checks.map((c) => (
-            <li key={c.id} className="flex items-center gap-3 py-3">
-              <span className={`text-lg ${c.ok ? "text-emerald-600" : c.optional ? "text-amber-500" : "text-rose-600"}`}>
-                {c.ok ? "✓" : c.optional ? "○" : "✗"}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold">
-                  {c.label}
-                  {c.optional && !c.ok && <span className="ml-2 text-xs font-normal text-slate-400">optional</span>}
-                </div>
-                <div className="break-all text-xs text-slate-500 dark:text-slate-400">{c.detail}</div>
-              </div>
-              {c.installable && (
-                <button type="button" className={BTN_GHOST} disabled={busy !== null} onClick={() => void installOne(c)}>
-                  {busy === c.id ? "Installing…" : "Install"}
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
+        <>
+          <h3 className="mt-6 text-xs font-semibold uppercase tracking-wider text-slate-500">Required</h3>
+          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+            {required.map((c) => <RequirementRow key={c.id} c={c} busy={busy} onInstall={(x) => void installOne(x)} />)}
+          </ul>
+          <h3 className="mt-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
+            For premium Chrome searches <span className="font-normal normal-case tracking-normal">(optional, add any time)</span>
+          </h3>
+          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+            {chrome.map((c) => <RequirementRow key={c.id} c={c} busy={busy} onInstall={(x) => void installOne(x)} />)}
+          </ul>
+        </>
       )}
 
       {log && (
         <pre className="mt-3 max-h-48 overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-slate-100">{log}</pre>
       )}
 
-      <div className="mt-5 flex flex-wrap gap-3">
-        {missing.length > 0 && (
-          <button type="button" className={BTN} disabled={busy !== null} onClick={() => void installAll()}>
-            {busy ? "Installing… (can take a minute)" : `Install missing (${missing.length})`}
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <button type="button" className="text-sm text-indigo-600 underline disabled:opacity-50 dark:text-indigo-400"
+          disabled={rechecking || busy !== null} onClick={() => void recheck()}>
+          {rechecking ? "Checking…" : "Check again"}
+        </button>
+        {!blocking && installable.length > 0 && (
+          <button type="button" className="text-sm text-slate-500 underline" onClick={onNext}>
+            Skip for now →
           </button>
         )}
-        <button type="button" className={missing.length ? BTN_GHOST : BTN} disabled={blocking || busy !== null} onClick={onNext}>
-          Continue →
-        </button>
       </div>
+
+      <DemoOffer />
     </section>
   );
 }
 
-// "Try a demo first": explore with made-up data before any setup.
 function DemoOffer() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -499,7 +581,116 @@ function AuthStep({
         </button>
         {result && <span className="text-sm text-emerald-600 dark:text-emerald-400">{result}</span>}
       </div>
+
+      {status.auth.connected && <ChromeConnect onError={onError} />}
     </section>
+  );
+}
+
+// ===== Chrome searches: the three things they need =====
+//
+// Premium searches drive the user's own Chrome through the Claude in Chrome
+// extension. What actually breaks it (found 2026-11-04): the quick sign-in
+// token can't use Chrome — Anthropic's browser bridge answers "403 missing
+// scope" — so Chrome needs the FULL Claude sign-in. This checklist shows each
+// requirement with a fix, then a real connection test.
+
+function ChromeStep({ n, ok, children }: { n: number; ok: boolean | null; children: React.ReactNode }) {
+  return (
+    <li className="flex gap-3">
+      <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold text-white ${ok ? "bg-emerald-600" : "bg-slate-400 dark:bg-slate-600"}`}>
+        {ok ? "✓" : n}
+      </span>
+      <div className="pt-0.5 text-sm text-slate-700 dark:text-slate-300">{children}</div>
+    </li>
+  );
+}
+
+function ChromeConnect({ onError }: { onError: (m: string | null) => void }) {
+  const [ready, setReady] = useState<ChromeReadiness | null>(null);
+  const [check, setCheck] = useState<ChromeCheck | null>(null);
+  const [testing, setTesting] = useState(false);
+
+  const load = useCallback(() => {
+    api.setupChrome().then(setReady).catch((e) => onError(errText(e)));
+  }, [onError]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const test = async () => {
+    setTesting(true);
+    setCheck(null);
+    try {
+      setCheck(await api.chromeCheck());
+      load();
+    } catch (e) {
+      onError(errText(e));
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  return (
+    <div className="mt-6 rounded-xl border border-fuchsia-200 bg-fuchsia-50/40 p-4 dark:border-fuchsia-500/30 dark:bg-fuchsia-500/5">
+      <p className="font-semibold text-slate-900 dark:text-slate-100">Optional: connect Chrome for premium searches</p>
+      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+        Premium searches let Claude browse a company&apos;s own careers site in your Chrome, for companies
+        without a public job board. Skip this if you don&apos;t need it.
+      </p>
+      {!ready ? (
+        <p className="mt-3 text-xs text-slate-400">Checking…</p>
+      ) : (
+        <ol className="mt-3 space-y-3">
+          <ChromeStep n={1} ok={ready.extension_installed === true}>
+            {ready.extension_installed ? (
+              <>The Claude in Chrome extension is installed.</>
+            ) : (
+              <>
+                Install the{" "}
+                <a className="text-indigo-600 underline" href={ready.extension_url} target="_blank" rel="noreferrer">
+                  Claude in Chrome extension
+                </a>{" "}
+                in Google Chrome, click its icon, and sign in with your Claude account.
+                {ready.extension_installed === null && " (We couldn't find Chrome on this computer.)"}
+              </>
+            )}
+          </ChromeStep>
+          <ChromeStep n={2} ok={ready.signed_in}>
+            {ready.signed_in ? (
+              <>Signed in to Claude for Chrome{ready.account ? <> as <b>{ready.account}</b></> : null}. Use the same account in the extension.</>
+            ) : (
+              <>
+                <p>
+                  Sign in to your Claude account for Chrome. The quick sign-in can score jobs but isn&apos;t
+                  allowed to use Chrome.
+                </p>
+                {ready.cli_found ? (
+                  <div className="mt-2">
+                    <ClaudeLogin disabled={false} onError={onError} onLoggedIn={load} label="Sign in for Chrome" />
+                  </div>
+                ) : (
+                  <p className="mt-1 text-xs text-slate-500">Install Claude Code first (step 1 of Setup).</p>
+                )}
+              </>
+            )}
+          </ChromeStep>
+          <ChromeStep n={3} ok={check?.connected ?? null}>
+            <p>Keep Chrome open and test the connection (about 15 seconds).</p>
+            <button type="button" className={`mt-2 ${BTN_GHOST}`} disabled={testing || !ready.cli_found} onClick={() => void test()}>
+              {testing ? "Testing… (~15s)" : "Test Chrome connection"}
+            </button>
+            {check && (
+              <p className={`mt-2 text-xs ${check.connected ? "text-emerald-700 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300"}`}>
+                {check.connected ? "✓ " : "✗ "}
+                {check.detail}
+              </p>
+            )}
+          </ChromeStep>
+        </ol>
+      )}
+    </div>
   );
 }
 
@@ -509,10 +700,12 @@ function ClaudeLogin({
   disabled,
   onError,
   onLoggedIn,
+  label = "Log in with Claude",
 }: {
   disabled: boolean;
   onError: (m: string | null) => void;
   onLoggedIn: () => void;
+  label?: string;
 }) {
   const [login, setLogin] = useState<LoginStatus | null>(null);
   const [code, setCode] = useState("");
@@ -561,7 +754,7 @@ function ClaudeLogin({
     <div className="space-y-2 rounded-xl border border-slate-200 p-4 dark:border-slate-700">
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" className={BTN} disabled={disabled || running} onClick={() => void start()}>
-          {running ? "Waiting for login…" : login?.state === "done" ? "Logged in ✓" : "Log in with Claude"}
+          {running ? "Waiting for login…" : login?.state === "done" ? "Logged in ✓" : label}
         </button>
         {running && (
           <button
@@ -780,7 +973,7 @@ function PremiumSearch({
   const [queued, setQueued] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [checking, setChecking] = useState(false);
-  const [chrome, setChrome] = useState<{ connected: boolean; detail: string } | null>(null);
+  const [chrome, setChrome] = useState<ChromeCheck | null>(null);
   const [launched, setLaunched] = useState(false);
   const [usageText, setUsageText] = useState<string | null>(null);
 

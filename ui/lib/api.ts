@@ -43,6 +43,8 @@ import type {
   ResumeChanges,
   PrintSpec,
   JobiApplyResult,
+  ChromeCheck,
+  ChromeReadiness,
   JobiEvent,
   JobiState,
 } from "./types";
@@ -145,7 +147,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ component }),
     }),
-  setupLoginStart: () => request<LoginStatus>("/api/setup/login/start", { method: "POST" }),
+  /** kind "full" = `claude auth login` (works with Chrome); "token" = setup-token. */
+  setupLoginStart: (kind: "full" | "token" = "full") =>
+    request<LoginStatus>("/api/setup/login/start", { method: "POST", body: JSON.stringify({ kind }) }),
+  setupChrome: () => request<ChromeReadiness>("/api/setup/chrome"),
   setupLoginStatus: () => request<LoginStatus>("/api/setup/login/status"),
   setupLoginInput: (text: string) =>
     request<LoginStatus>("/api/setup/login/input", {
@@ -194,8 +199,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ companies, job_keys: jobKeys }),
     }),
-  chromeCheck: () =>
-    request<{ connected: boolean; detail: string }>("/api/chrome-claude/check"),
+  chromeCheck: () => request<ChromeCheck>("/api/chrome-claude/check"),
   premiumPending: () =>
     request<{ pending: { id: string; ad_hoc_companies: string[] }[] }>(
       "/api/chrome-claude/premium",
