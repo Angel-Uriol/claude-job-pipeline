@@ -1,18 +1,42 @@
 # claude-job-pipeline
 
-A local, Claude-powered job search that runs on your own machine. Answer a short
-questionnaire (Claude asks the questions), and the pipeline will:
+**A Claude-powered job search that runs on your own computer.** Tell it about yourself
+once; it finds openings at the companies you care about, scores each one against your
+real experience, and tailors your resume for the ones worth applying to, without
+inventing a single skill or number.
 
-1. **Scrape** open roles from the companies you care about (Greenhouse, Lever and
-   Ashby job boards, plus RemoteOK and optional open-web search).
-2. **Score** every posting against *your* profile: a cheap Claude pre-filter, then a
-   five-axis deep-fit rubric (stack · level · function · bridgeability · desirability).
-3. **Digest** the results into a daily HTML report, with ready-made browser-agent
-   prompts for companies that don't have a public job board.
-4. **Tailor** a `.docx` resume per job, honestly. Claude can rephrase and reorder
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Runs locally](https://img.shields.io/badge/runs-on%20your%20computer-0f766e)
+![Powered by Claude](https://img.shields.io/badge/powered%20by-Claude-6366f1)
+
+Made by **[Angel Uriol](https://www.linkedin.com/in/angel-uriol-6463461a3)**, with
+**Jobi** 🤖, the app's built-in helper.
+
+![Today: your best matches, why they fit and what's missing](docs/images/discover.png)
+
+> ### ▶ Start in 3 steps
+> 1. Click the green **Code** button above → **Download ZIP**, and unzip it.
+> 2. Double-click **`Start.command`** (Mac) or **`Start.bat`** (Windows).
+>    *First time on a Mac: right-click → **Open** → **Open**.*
+> 3. Your browser opens the app. Click **Set up everything**, sign in with your
+>    Claude account, and answer a short chat. That's it.
+>
+> Just curious? Click **Try the demo** on the Setup page to explore with made-up jobs.
+
+## What it does
+
+1. **Searches** open roles at the companies you pick (Greenhouse, Lever and Ashby job
+   boards, plus RemoteOK and optional open-web search), or browses careers sites for
+   you in Chrome.
+2. **Scores** every posting against *your* profile: a cheap Claude pre-filter, then a
+   five-axis fit rubric (stack · level · function · bridgeability · desirability),
+   with plain reasons for each match and what's missing.
+3. **Tailors** a `.docx` resume per job, honestly. Claude can rephrase and reorder
    what's on your resume but never invents skills or changes a metric.
-5. **Track** applications in a built-in tracker (status, notes, stars, the resume you
-   sent).
+4. **Tracks** your applications (status, notes, follow-ups, the resume you sent) and
+   helps you **compare your top matches** (pay, benefits, reviews) and **prepare for interviews**.
+5. **Jobi** 🤖, a little helper in the corner, changes your profile, adds companies,
+   runs searches and fixes setup problems when you ask. Every change waits for your OK.
 
 Everything stays on your computer. Claude only sees what each step needs.
 
@@ -23,6 +47,36 @@ Everything stays on your computer. Claude only sees what each step needs.
  │ profile/ (config + resume + targets)  │      │ tracker                        │
  └───────────────────────────────────────┘      └────────────────────────────────┘
 ```
+
+## Screenshots
+
+| Setup checks everything for you | Jobi proposes, you click Apply |
+|---|---|
+| ![Setup: one button installs what's missing](docs/images/setup.png) | ![Jobi chat with change cards](docs/images/jobi.png) |
+
+| Track your applications |
+|---|
+| ![Application tracker](docs/images/track.png) |
+
+*Screenshots use the built-in demo profile (made-up person and companies).*
+
+## Meet Jobi
+
+Jobi is the round robot in the bottom-right corner of every page. Click it and ask in
+plain words:
+
+- *"Change my headline to mention Kafka"*, *"add Datadog to my companies"*,
+  *"only show jobs from the last week"*
+- *"Find new jobs"* or *"run a premium search of NVIDIA"*
+- *"Why did my Chrome search fail?"*: Jobi runs the checks, explains the cause and
+  suggests the fix
+
+Jobi never saves anything by itself. Each change shows up as a card with **before →
+after**, and nothing happens until you click **Apply**. It follows the same honesty
+rules as the rest of the app (no invented skills or numbers), and it can only run a
+short, fixed list of safe commands (like the app's health check). If a problem needs
+more than that, Jobi writes a ready-to-paste message for a new Claude Code chat.
+Jobi uses Claude Opus 5.5; each answer shows what it cost.
 
 ## Quick start
 
@@ -69,7 +123,7 @@ Open **http://localhost:8766**. The first visit takes you to the **Setup** page:
 | 4. Companies | Pre-filled with the employers found during the scans (job boards already verified); trim, add, re-check. |
 | 5. Review & save | See the three generated YAML files, then save. |
 
-Then go to **Discover** and press **Run daily**.
+Then open **Today** and press **Find new jobs**.
 
 Prefer the terminal? Run each step from the CLI instead:
 
@@ -196,77 +250,6 @@ Deep-fit scores each axis from 0 to 10 and combines them with these weights:
 `fit ≥ 8.0` → **apply**, `≥ 5.0` → **consider**, otherwise skip. You can change the
 thresholds in config. Jobs at your target companies get a tier bump (+0.3 to +0.7).
 
-## Optional extras
-
-- **Open-web search (JSearch):** add a free RapidAPI key as `JSEARCH_API_KEY` in
-  `.env`. Setup writes a few queries for you, and the **Search web** button runs them.
-- **✨ Premium search (Claude in Chrome), launched by the app:** on the Companies
-  step pick companies (by default the ones with no public job board) and queue a
-  premium search; then **Check Chrome connection** → **Launch** (or the ✨ button on
-  Discover). The app starts your Claude Code CLI with `--chrome`, and Claude browses
-  each company's own careers site in your Chrome, live progress on Discover
-  ("Visiting careers.nvidia.com…"). Found roles are imported into the profile
-  (skipping ones you already track) and scored. It's the most thorough search but
-  uses many more tokens. Safety: the session may only use Chrome's browsing tools —
-  no shell, no file writes, no forms or uploads — and is told never to log in,
-  apply or contact anyone.
-  **The app recommends it for you.** A ✨ suggestions card on Discover (and a
-  "Premium read" button on any job) proposes premium search only where it adds
-  something: companies with no public job board, dream companies whose board
-  returned nothing for you, and strong matches whose description looks cut off
-  (or, if you need sponsorship, doesn't mention it). Before you launch it says
-  what it costs in your terms: on a Claude Code login, your current 5-hour /
-  weekly plan usage (when Claude exposes it) and how much of a session a
-  premium search uses — measured on your own past runs; on an API key, a dollar
-  estimate learned from your past runs.
-  *Needs:* the Claude Code CLI with a **full Claude sign-in** (Setup → Connect
-  Claude → "Log in with Claude" / "Sign in for Chrome", which runs
-  `claude auth login`), and the [Claude in Chrome](https://claude.ai/chrome)
-  extension signed into the same account, with Chrome open. Setup's "Connect
-  Chrome" checklist checks each one and tests the connection.
-  *Why the full sign-in:* Claude Code reaches the extension through Anthropic's
-  browser bridge, and the bridge rejects the quick `claude setup-token` token
-  ("OAuth token forbidden (403) — missing scope"). Claude Desktop being open
-  doesn't get in the way.
-- **Chrome Claude (browser agent):** companies without a public board get a
-  copy-paste prompt in the digest. Or use **Run Chrome Claude** in Discover to queue
-  a run, which a Claude Code session with the
-  [Claude in Chrome](https://claude.com/chrome) extension works through by following
-  `prompts/chrome_claude_runbook.md`. Import the results with
-  `job-pipeline import --file run.jsonl --score`.
-- **Excel tracker:** `job-pipeline tracker` writes a color-coded `data/tracker.xlsx`.
-
-## Honesty rules (built in)
-
-These are enforced in the prompts and in code:
-- Resume parsing copies your resume as written, with metrics verbatim.
-- Tailoring may only rephrase and reorder. It keeps every number and bullet ID, and
-  never adds a skill, tool, employer or claim.
-- Scoring uses your **honest gaps** to judge bridgeability, and its "bridge notes"
-  suggest truthful framing, never fabrication.
-- The questionnaire records only what you actually said.
-
-## Re-running setup
-
-The Setup page is always in the top nav. Saving again backs up your current files
-to `*.bak`. You can also edit `profile/*.yaml` by hand; the app validates them at
-startup, so a typo fails loudly. To keep several profiles (for example, a friend's),
-point `JOB_PIPELINE_PROFILE_DIR` at another folder.
-
-## Development
-
-```bash
-make check          # ruff + mypy --strict + pytest
-cd ui && npx tsc --noEmit && npx eslint app components lib
-```
-
-Tests run against `examples/profile/` and a fake Claude client, so they never call
-the network or need a key. See [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## License
-
-MIT. See [LICENSE](LICENSE).
-
 ## Compare recommendations and prepare for interviews
 
 **Compare** (also linked from Discover) researches up to five final `apply` or
@@ -317,3 +300,89 @@ and sources, especially self-selected reviews and interview anecdotes.
 Saved reports travel with **profile export/import** (with history): finished
 reports are included and validated on import; running ones are skipped. Tests
 use fictional profiles and mocked research, never live Claude calls.
+
+## Optional extras
+
+- **Open-web search (JSearch):** add a free RapidAPI key as `JSEARCH_API_KEY` in
+  `.env`. Setup writes a few queries for you, and the **Search web** button runs them.
+- **✨ Premium search (Claude in Chrome), launched by the app:** on the Companies
+  step pick companies (by default the ones with no public job board) and queue a
+  premium search; then **Check Chrome connection** → **Launch** (or the ✨ button on
+  Discover). The app starts your Claude Code CLI with `--chrome`, and Claude browses
+  each company's own careers site in your Chrome, live progress on Discover
+  ("Visiting careers.nvidia.com…"). Found roles are imported into the profile
+  (skipping ones you already track) and scored. It's the most thorough search but
+  uses many more tokens. Safety: the session may only use Chrome's browsing tools —
+  no shell, no file writes, no forms or uploads — and is told never to log in,
+  apply or contact anyone.
+  **The app recommends it for you.** A ✨ suggestions card on Discover (and a
+  "Premium read" button on any job) proposes premium search only where it adds
+  something: companies with no public job board, dream companies whose board
+  returned nothing for you, and strong matches whose description looks cut off
+  (or, if you need sponsorship, doesn't mention it). Before you launch it says
+  what it costs in your terms: on a Claude Code login, your current 5-hour /
+  weekly plan usage (when Claude exposes it) and how much of a session a
+  premium search uses — measured on your own past runs; on an API key, a dollar
+  estimate learned from your past runs.
+  *Needs:* the Claude Code CLI with a **full Claude sign-in** (Setup → Connect
+  Claude → "Log in with Claude" / "Sign in for Chrome", which runs
+  `claude auth login`), and the [Claude in Chrome](https://claude.ai/chrome)
+  extension signed into the same account, with Chrome open. Setup's "Connect
+  Chrome" checklist checks each one and tests the connection.
+  *Why the full sign-in:* Claude Code reaches the extension through Anthropic's
+  browser bridge, and the bridge rejects the quick `claude setup-token` token
+  ("OAuth token forbidden (403) — missing scope"). Claude Desktop being open
+  doesn't get in the way.
+- **Chrome Claude (browser agent):** companies without a public board get a
+  copy-paste prompt in the digest. Or use **Run Chrome Claude** in Discover to queue
+  a run, which a Claude Code session with the
+  [Claude in Chrome](https://claude.com/chrome) extension works through by following
+  `prompts/chrome_claude_runbook.md`. Import the results with
+  `job-pipeline import --file run.jsonl --score`.
+- **Excel tracker:** `job-pipeline tracker` writes a color-coded `data/tracker.xlsx`.
+
+## Honesty rules (built in)
+
+These are enforced in the prompts and in code:
+- Resume parsing copies your resume as written, with metrics verbatim.
+- Tailoring may only rephrase and reorder. It keeps every number and bullet ID, and
+  never adds a skill, tool, employer or claim.
+- Scoring uses your **honest gaps** to judge bridgeability, and its "bridge notes"
+  suggest truthful framing, never fabrication.
+- The questionnaire records only what you actually said.
+
+## Changing your profile later
+
+Nothing is locked after setup. Pick whichever is easiest:
+- **Ask Jobi**, e.g. *"add Go to my skills"* or *"remove Uber from my companies"*.
+- **My info** and **Resume** pages: edit everything as a form.
+- **Setup → Your profile → Change my answers** reopens the setup chat with your saved
+  answers (including later edits) so you can redo part of it.
+
+Saving again backs up your current files to `*.bak`. You can also edit
+`profiles/<name>/*.yaml` by hand; the app validates them at startup, so a typo fails
+loudly.
+
+## Known limits
+
+- **Premium Chrome searches are thorough but heavy:** one company can use a good
+  chunk of a Claude plan session. The app shows the cost before you launch.
+- Public job-board coverage is Greenhouse, Lever, Ashby and RemoteOK; other companies
+  need a premium search or the copy-paste browser prompt.
+- Scores are a starting point, not a verdict. Read the reasons, and the posting.
+
+Ideas and bug reports are welcome in [Issues](https://github.com/Angel-Uriol/claude-job-pipeline/issues).
+
+## Development
+
+```bash
+make check          # ruff + mypy --strict + pytest
+cd ui && npx tsc --noEmit && npx eslint app components lib
+```
+
+Tests run against `examples/profile/` and a fake Claude client, so they never call
+the network or need a key. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+MIT. See [LICENSE](LICENSE).
